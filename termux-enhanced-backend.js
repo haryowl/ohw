@@ -856,9 +856,9 @@ function addParsedData(data) {
             console.log('IMEI extracted and persisted:', lastIMEI);
         }
         
-        // Extract coordinates (tag 0x20)
-        if (tags['0x20']) {
-            const coords = tags['0x20'].value;
+        // Extract coordinates (tag 0x30)
+        if (tags['0x30']) {
+            const coords = tags['0x30'].value;
             if (coords && typeof coords === 'object') {
                 extractedData.latitude = coords.latitude;
                 extractedData.longitude = coords.longitude;
@@ -868,9 +868,9 @@ function addParsedData(data) {
             }
         }
         
-        // Extract speed and direction (tag 0x21)
-        if (tags['0x21']) {
-            const speedDir = tags['0x21'].value;
+        // Extract speed and direction (tag 0x33)
+        if (tags['0x33']) {
+            const speedDir = tags['0x33'].value;
             if (speedDir && typeof speedDir === 'object') {
                 extractedData.speed = speedDir.speed;
                 extractedData.direction = speedDir.direction;
@@ -878,64 +878,72 @@ function addParsedData(data) {
             }
         }
         
-        // Extract altitude (tag 0x22)
-        if (tags['0x22']) {
-            extractedData.altitude = tags['0x22'].value;
-            console.log('Altitude extracted:', tags['0x22'].value);
+        // Extract altitude/height (tag 0x34)
+        if (tags['0x34']) {
+            extractedData.altitude = tags['0x34'].value;
+            console.log('Altitude extracted:', tags['0x34'].value);
         }
         
-        // Extract course (tag 0x23)
-        if (tags['0x23']) {
-            extractedData.course = tags['0x23'].value;
-            console.log('Course extracted:', tags['0x23'].value);
+        // Extract HDOP (tag 0x35)
+        if (tags['0x35']) {
+            extractedData.hdop = tags['0x35'].value;
+            console.log('HDOP extracted:', tags['0x35'].value);
         }
         
-        // Extract HDOP (tag 0x24)
-        if (tags['0x24']) {
-            extractedData.hdop = tags['0x24'].value;
-            console.log('HDOP extracted:', tags['0x24'].value);
-        }
-        
-        // Extract VDOP (tag 0x25)
-        if (tags['0x25']) {
-            extractedData.vdop = tags['0x25'].value;
-            console.log('VDOP extracted:', tags['0x25'].value);
-        }
-        
-        // Extract PDOP (tag 0x26)
-        if (tags['0x26']) {
-            extractedData.pdop = tags['0x26'].value;
-            console.log('PDOP extracted:', tags['0x26'].value);
-        }
-        
-        // Extract temperature (tag 0x30)
-        if (tags['0x30']) {
-            extractedData.temperature = tags['0x30'].value;
-            console.log('Temperature extracted:', tags['0x30'].value);
-        }
-        
-        // Extract voltage (tag 0x31)
-        if (tags['0x31']) {
-            extractedData.voltage = tags['0x31'].value;
-            console.log('Voltage extracted:', tags['0x31'].value);
-        }
-        
-        // Extract inputs (tag 0x40)
+        // Extract status (tag 0x40)
         if (tags['0x40']) {
-            extractedData.inputs = tags['0x40'].value;
-            console.log('Inputs extracted:', tags['0x40'].value);
+            extractedData.status = tags['0x40'].value;
+            console.log('Status extracted:', tags['0x40'].value);
         }
         
-        // Extract outputs (tag 0x41)
+        // Extract supply voltage (tag 0x41)
         if (tags['0x41']) {
-            extractedData.outputs = tags['0x41'].value;
-            console.log('Outputs extracted:', tags['0x41'].value);
+            extractedData.voltage = tags['0x41'].value;
+            console.log('Supply voltage extracted:', tags['0x41'].value);
         }
         
-        // Extract status (tag 0x50)
+        // Extract battery voltage (tag 0x42)
+        if (tags['0x42']) {
+            extractedData.batteryVoltage = tags['0x42'].value;
+            console.log('Battery voltage extracted:', tags['0x42'].value);
+        }
+        
+        // Extract outputs (tag 0x45)
+        if (tags['0x45']) {
+            extractedData.outputs = tags['0x45'].value;
+            console.log('Outputs extracted:', tags['0x45'].value);
+        }
+        
+        // Extract inputs (tag 0x46)
+        if (tags['0x46']) {
+            extractedData.inputs = tags['0x46'].value;
+            console.log('Inputs extracted:', tags['0x46'].value);
+        }
+        
+        // Extract input voltages (tags 0x50, 0x51, 0x52)
         if (tags['0x50']) {
-            extractedData.status = tags['0x50'].value;
-            console.log('Status extracted:', tags['0x50'].value);
+            extractedData.inputVoltage0 = tags['0x50'].value;
+            console.log('Input voltage 0 extracted:', tags['0x50'].value);
+        }
+        if (tags['0x51']) {
+            extractedData.inputVoltage1 = tags['0x51'].value;
+            console.log('Input voltage 1 extracted:', tags['0x51'].value);
+        }
+        if (tags['0x52']) {
+            extractedData.inputVoltage2 = tags['0x52'].value;
+            console.log('Input voltage 2 extracted:', tags['0x52'].value);
+        }
+        
+        // Extract date/time (tag 0x20)
+        if (tags['0x20']) {
+            extractedData.datetime = tags['0x20'].value;
+            console.log('Date/time extracted:', tags['0x20'].value);
+        }
+        
+        // Extract milliseconds (tag 0x21)
+        if (tags['0x21']) {
+            extractedData.milliseconds = tags['0x21'].value;
+            console.log('Milliseconds extracted:', tags['0x21'].value);
         }
         
         // Add to data array
@@ -964,8 +972,8 @@ function addParsedData(data) {
             latitude: extractedData.latitude,
             longitude: extractedData.longitude,
             speed: extractedData.speed,
-            temperature: extractedData.temperature,
-            voltage: extractedData.voltage
+            voltage: extractedData.voltage,
+            status: extractedData.status
         });
         
         logger.info(`Added data for device: ${extractedData.deviceId || 'unknown'}`);
