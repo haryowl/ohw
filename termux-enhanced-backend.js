@@ -215,24 +215,30 @@ function validatePacket(buffer) {
     };
 }
 
-// Parse extended tags (0xFE)
+// Parse extended tags (0xFE) - following parser.js exactly
 async function parseExtendedTags(buffer, offset) {
-    const extendedTags = {};
+    const result = {};
     let currentOffset = offset;
-
-    while (currentOffset < buffer.length - 2) {
+    
+    // Read the length of extended tags block (2 bytes)
+    const length = buffer.readUInt16LE(currentOffset);
+    currentOffset += 2;
+    
+    const endOffset = currentOffset + length;
+    
+    while (currentOffset < endOffset) {
+        // Extended tags are 2 bytes each
         const tag = buffer.readUInt16LE(currentOffset);
         currentOffset += 2;
-
-        if (tag === 0xFFFF) {
-            break; // End of extended tags
-        }
-
+        
+        // Look up extended tag definition
         const tagHex = `0x${tag.toString(16).padStart(4, '0')}`;
         const definition = tagDefinitions[tagHex];
 
         if (!definition) {
             console.warn(`Unknown extended tag: ${tagHex}`);
+            // Skip 4 bytes for unknown extended tags
+            currentOffset += 4;
             continue;
         }
 
@@ -266,77 +272,20 @@ async function parseExtendedTags(buffer, offset) {
                 value = buffer.readInt32LE(currentOffset);
                 currentOffset += 4;
                 break;
-            case 'string':
-                value = buffer.toString('utf8', currentOffset, currentOffset + definition.length);
-                currentOffset += definition.length;
-                break;
-            case 'datetime':
-                value = new Date(buffer.readUInt32LE(currentOffset) * 1000);
-                currentOffset += 4;
-                break;
-            case 'coordinates':
-                const satellites = buffer.readUInt8(currentOffset) & 0x0F;
-                const correctness = (buffer.readUInt8(currentOffset) >> 4) & 0x0F;
-                currentOffset++;
-                const lat = buffer.readInt32LE(currentOffset) / 1000000;
-                currentOffset += 4;
-                const lon = buffer.readInt32LE(currentOffset) / 1000000;
-                currentOffset += 4;
-                value = { latitude: lat, longitude: lon, satellites, correctness };
-                break;
-            case 'status':
-                value = buffer.readUInt16LE(currentOffset);
-                currentOffset += 2;
-                break;
-            case 'outputs':
-                const outputsValue = buffer.readUInt16LE(currentOffset);
-                const outputsBinary = outputsValue.toString(2).padStart(16, '0');
-                value = {
-                    raw: outputsValue,
-                    binary: outputsBinary,
-                    states: {}
-                };
-                for (let i = 0; i < 16; i++) {
-                    value.states[`output${i}`] = outputsBinary[15 - i] === '1';
-                }
-                currentOffset += 2;
-                break;
-            case 'inputs':
-                const inputsValue = buffer.readUInt16LE(currentOffset);
-                const inputsBinary = inputsValue.toString(2).padStart(16, '0');
-                value = {
-                    raw: inputsValue,
-                    binary: inputsBinary,
-                    states: {}
-                };
-                for (let i = 0; i < 16; i++) {
-                    value.states[`input${i}`] = inputsBinary[15 - i] === '1';
-                }
-                currentOffset += 2;
-                break;
-            case 'speedDirection':
-                const speedValue = buffer.readUInt16LE(currentOffset);
-                const directionValue = buffer.readUInt16LE(currentOffset + 2);
-                value = {
-                    speed: speedValue / 10,
-                    direction: directionValue / 10
-                };
-                currentOffset += 4;
-                break;
             default:
                 console.warn(`Unsupported extended tag type: ${definition.type}`);
-                currentOffset += definition.length || 1;
+                currentOffset += 4; // Default to 4 bytes
                 value = null;
         }
 
-        extendedTags[tagHex] = {
+        result[tagHex] = {
             value: value,
             type: definition.type,
             description: definition.description
         };
     }
 
-    return [extendedTags, currentOffset];
+    return [result, currentOffset];
 }
 
 // Parse main packet following parser.js implementation
