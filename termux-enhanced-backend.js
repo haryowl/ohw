@@ -881,6 +881,7 @@ function addParsedData(data) {
         // Extract altitude/height (tag 0x34)
         if (tags['0x34']) {
             extractedData.altitude = tags['0x34'].value;
+            extractedData.height = tags['0x34'].value; // Also set height for frontend compatibility
             console.log('Altitude extracted:', tags['0x34'].value);
         }
         
@@ -899,6 +900,7 @@ function addParsedData(data) {
         // Extract supply voltage (tag 0x41)
         if (tags['0x41']) {
             extractedData.voltage = tags['0x41'].value;
+            extractedData.supplyVoltage = tags['0x41'].value; // Also set supplyVoltage for frontend compatibility
             console.log('Supply voltage extracted:', tags['0x41'].value);
         }
         
@@ -906,6 +908,12 @@ function addParsedData(data) {
         if (tags['0x42']) {
             extractedData.batteryVoltage = tags['0x42'].value;
             console.log('Battery voltage extracted:', tags['0x42'].value);
+        }
+        
+        // Extract temperature (tag 0x43)
+        if (tags['0x43']) {
+            extractedData.temperature = tags['0x43'].value;
+            console.log('Temperature extracted:', tags['0x43'].value);
         }
         
         // Extract outputs (tag 0x45)
@@ -1238,8 +1246,15 @@ function handleAPIRequest(req, res) {
                     latitude: data[0].latitude,
                     longitude: data[0].longitude,
                     speed: data[0].speed,
+                    direction: data[0].direction,
+                    height: data[0].height,
+                    satellites: data[0].satellites,
+                    supplyVoltage: data[0].supplyVoltage,
+                    batteryVoltage: data[0].batteryVoltage,
                     temperature: data[0].temperature,
-                    voltage: data[0].voltage
+                    status: data[0].status,
+                    hasTags: !!data[0].tags,
+                    tagCount: data[0].tags ? Object.keys(data[0].tags).length : 0
                 } : null
             });
             res.writeHead(200);
