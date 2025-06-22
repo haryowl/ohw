@@ -366,7 +366,7 @@
         // Configuration
         const config = {
             serverUrl: window.location.hostname === 'localhost' ? 'http://localhost:3001' : `http://${window.location.hostname}:3001`,
-            refreshInterval: 5000, // 5 seconds
+            refreshInterval: 3000, // 3 seconds
             maxRecords: 1000
         };
 
@@ -380,7 +380,6 @@
         // Initialize the application
         function init() {
             initializeMap();
-            setupWebSocket();
             startDataRefresh();
             updateStatus('Connecting to server...', false);
         }
@@ -393,48 +392,6 @@
             }).addTo(map);
         }
 
-        // Setup WebSocket connection
-        function setupWebSocket() {
-            const wsUrl = config.serverUrl.replace('http', 'ws') + '/ws';
-            
-            try {
-                const ws = new WebSocket(wsUrl);
-                
-                ws.onopen = function() {
-                    console.log('WebSocket connected');
-                    updateStatus('Connected', true);
-                    isConnected = true;
-                };
-                
-                ws.onmessage = function(event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.topic === 'device_data') {
-                            handleDeviceData(data.data);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing WebSocket message:', error);
-                    }
-                };
-                
-                ws.onclose = function() {
-                    console.log('WebSocket disconnected');
-                    updateStatus('Disconnected', false);
-                    isConnected = false;
-                    // Try to reconnect after 5 seconds
-                    setTimeout(setupWebSocket, 5000);
-                };
-                
-                ws.onerror = function(error) {
-                    console.error('WebSocket error:', error);
-                    updateStatus('Connection error', false);
-                };
-            } catch (error) {
-                console.error('WebSocket setup failed:', error);
-                updateStatus('WebSocket not available', false);
-            }
-        }
-
         // Start periodic data refresh
         function startDataRefresh() {
             refreshTimer = setInterval(refreshData, config.refreshInterval);
@@ -442,17 +399,23 @@
 
         // Refresh data from server
         async function refreshData() {
-            if (!isConnected) return;
-            
             try {
                 showLoading(true);
                 const response = await fetch(`${config.serverUrl}/api/data/latest`);
                 if (response.ok) {
                     const data = await response.json();
-                    handleDeviceData(data);
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        handleDeviceData(data);
+                        updateStatus('Connected', true);
+                    } else {
+                        updateStatus('Connected (no data)', true);
+                    }
+                } else {
+                    updateStatus('Server error', false);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
+                updateStatus('Connection failed', false);
             } finally {
                 showLoading(false);
             }
@@ -470,7 +433,6 @@
             });
             
             updateStats();
-            updateStatus('Connected', true);
         }
 
         // Add or update marker on map
@@ -525,15 +487,23 @@
 
         // Add data record to table
         function addDataRecord(record) {
-            // Add to beginning of array
-            dataRecords.unshift(record);
+            // Check if record already exists (avoid duplicates)
+            const existingIndex = dataRecords.findIndex(r => 
+                r.timestamp === record.timestamp && 
+                (r.deviceId === record.deviceId || r.imei === record.imei)
+            );
             
-            // Limit records
-            if (dataRecords.length > config.maxRecords) {
-                dataRecords = dataRecords.slice(0, config.maxRecords);
+            if (existingIndex === -1) {
+                // Add to beginning of array
+                dataRecords.unshift(record);
+                
+                // Limit records
+                if (dataRecords.length > config.maxRecords) {
+                    dataRecords = dataRecords.slice(0, config.maxRecords);
+                }
+                
+                updateDataTable();
             }
-            
-            updateDataTable();
         }
 
         // Update data table

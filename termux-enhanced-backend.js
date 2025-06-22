@@ -150,7 +150,7 @@ function parsePacketData(buffer) {
     
     // Try to extract IMEI if present (common in Galileosky packets)
     if (data.length >= 15) {
-        // Look for IMEI pattern (15 digits)
+        // Look for IMEI pattern (15 digits) in the data
         const dataHex = data.toString('hex');
         const imeiMatch = dataHex.match(/([0-9a-f]{15})/i);
         if (imeiMatch) {
@@ -159,20 +159,89 @@ function parsePacketData(buffer) {
         }
     }
     
-    // Try to extract coordinates if present
-    if (data.length >= 20) {
+    // Try to extract coordinates from different positions in the packet
+    // Galileosky packets can have coordinates in different formats
+    if (data.length >= 8) {
         try {
-            // Common position: 4 bytes for lat, 4 bytes for lon
-            const lat = data.readInt32LE(0) / 1000000;
-            const lon = data.readInt32LE(4) / 1000000;
+            // Try different coordinate extraction methods
             
-            if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-                parsedInfo.latitude = lat;
-                parsedInfo.longitude = lon;
+            // Method 1: Direct 4-byte coordinates (common format)
+            for (let offset = 0; offset <= data.length - 8; offset += 2) {
+                const lat = data.readInt32LE(offset) / 1000000;
+                const lon = data.readInt32LE(offset + 4) / 1000000;
+                
+                if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+                    parsedInfo.latitude = lat;
+                    parsedInfo.longitude = lon;
+                    parsedInfo.coordinateOffset = offset;
+                    break;
+                }
             }
+            
+            // Method 2: If no coordinates found, try with different scaling
+            if (!parsedInfo.latitude && !parsedInfo.longitude) {
+                for (let offset = 0; offset <= data.length - 8; offset += 2) {
+                    const lat = data.readInt32LE(offset) / 100000;
+                    const lon = data.readInt32LE(offset + 4) / 100000;
+                    
+                    if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+                        parsedInfo.latitude = lat;
+                        parsedInfo.longitude = lon;
+                        parsedInfo.coordinateOffset = offset;
+                        break;
+                    }
+                }
+            }
+            
+            // Method 3: Try with different byte order (big endian)
+            if (!parsedInfo.latitude && !parsedInfo.longitude) {
+                for (let offset = 0; offset <= data.length - 8; offset += 2) {
+                    const lat = data.readInt32BE(offset) / 1000000;
+                    const lon = data.readInt32BE(offset + 4) / 1000000;
+                    
+                    if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+                        parsedInfo.latitude = lat;
+                        parsedInfo.longitude = lon;
+                        parsedInfo.coordinateOffset = offset;
+                        break;
+                    }
+                }
+            }
+            
         } catch (e) {
             // Ignore coordinate parsing errors
         }
+    }
+    
+    // Try to extract speed if coordinates were found
+    if (parsedInfo.latitude && parsedInfo.longitude && parsedInfo.coordinateOffset) {
+        try {
+            // Speed is often stored near coordinates
+            const speedOffset = parsedInfo.coordinateOffset + 8;
+            if (speedOffset + 2 <= data.length) {
+                const speed = data.readUInt16LE(speedOffset) / 10; // Convert to km/h
+                if (speed >= 0 && speed <= 1000) {
+                    parsedInfo.speed = speed;
+                }
+            }
+        } catch (e) {
+            // Ignore speed parsing errors
+        }
+    }
+    
+    // Add status based on packet type
+    if (parsedInfo.header === 0x01) {
+        parsedInfo.status = 'Main Packet';
+    } else if (parsedInfo.header === 0x15) {
+        parsedInfo.status = 'Ignorable Packet';
+    } else {
+        parsedInfo.status = 'Extension Packet';
+    }
+    
+    // If no device ID found, create one from the packet hash
+    if (!parsedInfo.deviceId) {
+        const hash = require('crypto').createHash('md5').update(data).digest('hex').substring(0, 8);
+        parsedInfo.deviceId = `DEV_${hash}`;
     }
     
     return parsedInfo;
