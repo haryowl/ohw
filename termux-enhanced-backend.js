@@ -3,6 +3,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const express = require('express');
+const socketIo = require('socket.io');
+const cors = require('cors');
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, 'logs');
@@ -76,7 +79,91 @@ const activeConnections = new Map();
 let tcpServer = null;
 let httpServer = null;
 
-// Calculate CRC16 for packet validation
+// Tag definitions from tagDefinitions.js
+const tagDefinitions = {
+    '0x01': { type: 'uint8', description: 'Number Archive Records' },
+    '0x02': { type: 'uint8', description: 'Number Event Records' },
+    '0x03': { type: 'string', length: 15, description: 'IMEI' },
+    '0x04': { type: 'uint8', description: 'Number Service Records' },
+    '0x10': { type: 'uint8', description: 'Number Archive Records' },
+    '0x20': { type: 'datetime', description: 'Date and Time' },
+    '0x21': { type: 'uint16', description: 'Milliseconds' },
+    '0x30': { type: 'coordinates', description: 'Coordinates' },
+    '0x33': { type: 'speedDirection', description: 'Speed and Direction' },
+    '0x34': { type: 'uint16', description: 'Height' },
+    '0x35': { type: 'uint8', description: 'HDOP' },
+    '0x40': { type: 'status', description: 'Status' },
+    '0x41': { type: 'uint16', description: 'Supply Voltage' },
+    '0x42': { type: 'uint16', description: 'Battery Voltage' },
+    '0x43': { type: 'int8', description: 'Temperature' },
+    '0x44': { type: 'uint16', description: 'Acceleration' },
+    '0x45': { type: 'outputs', description: 'Outputs' },
+    '0x46': { type: 'inputs', description: 'Inputs' },
+    '0x47': { type: 'uint8', description: 'Eco Driving' },
+    '0x48': { type: 'uint16', description: 'Expanded Status' },
+    '0x49': { type: 'uint8', description: 'Transmission Channel' },
+    '0x50': { type: 'uint16', description: 'Input Voltage 0' },
+    '0x51': { type: 'uint16', description: 'Input Voltage 1' },
+    '0x52': { type: 'uint16', description: 'Input Voltage 2' },
+    '0x53': { type: 'uint16', description: 'Input Voltage 3' },
+    '0x54': { type: 'uint16', description: 'Input Voltage 4' },
+    '0x55': { type: 'uint16', description: 'Input Voltage 5' },
+    '0x56': { type: 'uint16', description: 'Input Voltage 6' },
+    '0xe2': { type: 'uint32', description: 'User Data 0' },
+    '0xe3': { type: 'uint32', description: 'User Data 1' },
+    '0xe4': { type: 'uint32', description: 'User Data 2' },
+    '0xe5': { type: 'uint32', description: 'User Data 3' },
+    '0xe6': { type: 'uint32', description: 'User Data 4' },
+    '0xe7': { type: 'uint32', description: 'User Data 5' },
+    '0xe8': { type: 'uint32', description: 'User Data 6' },
+    '0xe9': { type: 'uint32', description: 'User Data 7' },
+    '0x0001': { type: 'uint32_modbus', description: 'Modbus 0' },
+    '0x0002': { type: 'uint32_modbus', description: 'Modbus 1' },
+    '0x0003': { type: 'uint32_modbus', description: 'Modbus 2' },
+    '0x0004': { type: 'uint32_modbus', description: 'Modbus 3' },
+    '0x0005': { type: 'uint32_modbus', description: 'Modbus 4' },
+    '0x0006': { type: 'uint32_modbus', description: 'Modbus 5' },
+    '0x0007': { type: 'uint32_modbus', description: 'Modbus 6' },
+    '0x0008': { type: 'uint32_modbus', description: 'Modbus 7' },
+    '0x0009': { type: 'uint32_modbus', description: 'Modbus 8' },
+    '0x000a': { type: 'uint32_modbus', description: 'Modbus 9' },
+    '0x000b': { type: 'uint32_modbus', description: 'Modbus 10' },
+    '0x000c': { type: 'uint32_modbus', description: 'Modbus 11' },
+    '0x000d': { type: 'uint32_modbus', description: 'Modbus 12' },
+    '0x000e': { type: 'uint32_modbus', description: 'Modbus 13' },
+    '0x000f': { type: 'uint32_modbus', description: 'Modbus 14' },
+    '0x0010': { type: 'uint32_modbus', description: 'Modbus 15' }
+};
+
+// Packet type handler
+class PacketTypeHandler {
+    static isMainPacket(packetType) {
+        return packetType === 0x01;
+    }
+
+    static isIgnorablePacket(packetType) {
+        return packetType === 0x15;
+    }
+}
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'frontend', 'build')));
+
+// Store latest data
+let latestData = null;
+let lastIMEI = null;
+
+// Calculate CRC16
 function calculateCRC16(buffer) {
     let crc = 0xFFFF;
     for (let i = 0; i < buffer.length; i++) {
@@ -92,7 +179,7 @@ function calculateCRC16(buffer) {
     return crc;
 }
 
-// Validate packet structure
+// Validate packet structure and checksum
 function validatePacket(buffer) {
     if (buffer.length < 3) {
         throw new Error('Packet too short');
@@ -122,454 +209,642 @@ function validatePacket(buffer) {
     }
 
     return {
-        header,
         hasUnsentData,
         actualLength,
-        rawLength,
-        expectedLength
+        rawLength
     };
 }
 
-// Parse packet data and extract useful information using proper Galileosky protocol
-function parsePacketData(buffer) {
-    const packetInfo = validatePacket(buffer);
-    
-    // Extract the data portion (skip header and length)
-    const dataStart = 3;
-    const dataEnd = packetInfo.expectedLength;
-    const data = buffer.slice(dataStart, dataEnd);
-    
-    // Basic packet info
-    const parsedInfo = {
-        header: packetInfo.header,
-        hasUnsentData: packetInfo.hasUnsentData,
-        length: packetInfo.actualLength,
-        timestamp: new Date().toISOString(),
-        rawData: data.toString('hex').toUpperCase(),
-        tags: {},
-        parameters: {},
-        records: []
-    };
-    
-    // Parse based on packet type and size according to Galileosky protocol
-    if (packetInfo.header === 0x01) {
-        // Main Packet (0x01) - Parse based on size
-        if (packetInfo.actualLength < 32) {
-            // Single record main packet (< 32 bytes)
-            parsedInfo.packetType = 'Single Record Main Packet';
-            parsedInfo.records = [parseSingleRecord(data, 0)];
-        } else {
-            // Multiple records main packet (>= 32 bytes)
-            parsedInfo.packetType = 'Multiple Records Main Packet';
-            parsedInfo.records = parseMultipleRecords(data);
-        }
-    } else if (packetInfo.header === 0x15) {
-        // Ignorable packet - just needs confirmation
-        parsedInfo.packetType = 'Ignorable Packet';
-        parsedInfo.records = [parseIgnorablePacket(data)];
-    } else {
-        // Extension packet
-        parsedInfo.packetType = 'Extension Packet';
-        parsedInfo.records = [parseExtensionPacket(data)];
-    }
-    
-    // Extract common parameters from the first record
-    if (parsedInfo.records.length > 0) {
-        const firstRecord = parsedInfo.records[0];
-        Object.assign(parsedInfo, firstRecord);
-        
-        // Combine all tags from all records
-        parsedInfo.tags = {};
-        parsedInfo.parameters = {};
-        parsedInfo.records.forEach(record => {
-            if (record.tags) {
-                Object.assign(parsedInfo.tags, record.tags);
-            }
-            if (record.parameters) {
-                Object.assign(parsedInfo.parameters, record.parameters);
-            }
-        });
-    }
-    
-    // Extract common parameters for easy access
-    if (parsedInfo.parameters['IMEI']) {
-        parsedInfo.imei = parsedInfo.parameters['IMEI'];
-        parsedInfo.deviceId = parsedInfo.parameters['IMEI'];
-    }
-    
-    if (parsedInfo.parameters['Coordinates']) {
-        const coords = parsedInfo.parameters['Coordinates'];
-        parsedInfo.latitude = coords.latitude;
-        parsedInfo.longitude = coords.longitude;
-        parsedInfo.satellites = coords.satellites;
-    }
-    
-    if (parsedInfo.parameters['Speed and Direction']) {
-        const speedDir = parsedInfo.parameters['Speed and Direction'];
-        parsedInfo.speed = speedDir.speed;
-        parsedInfo.direction = speedDir.direction;
-    }
-    
-    if (parsedInfo.parameters['Height']) {
-        parsedInfo.height = parsedInfo.parameters['Height'];
-    }
-    
-    if (parsedInfo.parameters['Supply Voltage']) {
-        parsedInfo.supplyVoltage = parsedInfo.parameters['Supply Voltage'];
-    }
-    
-    if (parsedInfo.parameters['Battery Voltage']) {
-        parsedInfo.batteryVoltage = parsedInfo.parameters['Battery Voltage'];
-    }
-    
-    if (parsedInfo.parameters['Inside Temperature']) {
-        parsedInfo.temperature = parsedInfo.parameters['Inside Temperature'];
-    }
-    
-    if (parsedInfo.parameters['Status']) {
-        parsedInfo.status = parsedInfo.parameters['Status'];
-    }
-    
-    // If no device ID found, create one from the packet hash
-    if (!parsedInfo.deviceId) {
-        const hash = require('crypto').createHash('md5').update(data).digest('hex').substring(0, 8);
-        parsedInfo.deviceId = `DEV_${hash}`;
-    }
-    
-    return parsedInfo;
-}
-
-// Parse single record (for packets < 32 bytes)
-function parseSingleRecord(buffer, offset) {
-    const record = {
-        tags: {},
-        parameters: {}
-    };
-    
+// Parse extended tags (0xFE)
+async function parseExtendedTags(buffer, offset) {
+    const extendedTags = {};
     let currentOffset = offset;
-    
-    while (currentOffset < buffer.length - 2) { // -2 for CRC
-        const tag = buffer.readUInt8(currentOffset);
-        
-        // Stop if we encounter a null byte (separator)
-        if (tag === 0) {
-            break;
-        }
-        
-        try {
-            const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-            const tagDef = getTagDefinition(tagHex);
-            
-            if (tagDef) {
-                const [tagValue, newOffset] = parseTagValue(buffer, currentOffset, tagDef);
-                if (tagValue !== null) {
-                    record.tags[tagHex] = {
-                        name: tagDef.name,
-                        value: tagValue,
-                        type: tagDef.type,
-                        description: tagDef.description
-                    };
-                    
-                    // Add to parameters for easy access
-                    record.parameters[tagDef.name] = tagValue;
-                }
-                currentOffset = newOffset;
-            } else {
-                // Unknown tag, skip it
-                currentOffset++;
-            }
-        } catch (error) {
-            // Skip this tag and continue
-            currentOffset++;
-        }
-    }
-    
-    return record;
-}
 
-// Parse multiple records (for packets >= 32 bytes)
-function parseMultipleRecords(buffer) {
-    const records = [];
-    let currentOffset = 0;
-    
-    // Look for 0x10 tags to identify multiple records
-    while (currentOffset < buffer.length - 2) { // -2 for CRC
-        // Find the next 0x10 tag (Archive Record Number)
-        let recordStart = -1;
-        for (let i = currentOffset; i < buffer.length - 2; i++) {
-            if (buffer.readUInt8(i) === 0x10) {
-                recordStart = i;
-                break;
-            }
-        }
-        
-        if (recordStart === -1) {
-            // No more 0x10 tags found
-            break;
-        }
-        
-        // Parse this record
-        const record = { tags: {} };
-        let recordOffset = recordStart;
-        
-        while (recordOffset < buffer.length - 2) {
-            const tag = buffer.readUInt8(recordOffset);
-            recordOffset++;
-            
-            // Stop if we encounter another 0x10 tag (next record)
-            if (tag === 0x10 && recordOffset > recordStart + 1) {
-                recordOffset--;
-                break;
-            }
-            
-            // Stop if we encounter a null byte (separator)
-            if (tag === 0) {
-                break;
-            }
-            
-            try {
-                const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-                const tagDef = getTagDefinition(tagHex);
-                
-                if (tagDef) {
-                    const [tagValue, newOffset] = parseTagValue(buffer, recordOffset, tagDef);
-                    if (tagValue !== null) {
-                        record.tags[tagHex] = {
-                            name: tagDef.name,
-                            value: tagValue,
-                            type: tagDef.type,
-                            description: tagDef.description
-                        };
-                    }
-                    recordOffset = newOffset;
-                } else {
-                    // Unknown tag, skip it
-                    recordOffset++;
-                }
-            } catch (error) {
-                // Skip this tag and continue
-                recordOffset++;
-            }
-        }
-        
-        // Add record if it has tags
-        if (Object.keys(record.tags).length > 0) {
-            records.push(record);
-        }
-        
-        // Move to next potential record
-        currentOffset = recordStart + 1;
-    }
-    
-    return records;
-}
+    while (currentOffset < buffer.length - 2) {
+        const tag = buffer.readUInt16LE(currentOffset);
+        currentOffset += 2;
 
-// Parse ignorable packet (0x15)
-function parseIgnorablePacket(buffer) {
-    return {
-        tags: {},
-        parameters: {},
-        packetType: 'Ignorable Packet',
-        message: 'Ignorable packet - only confirmation needed'
-    };
-}
+        if (tag === 0xFFFF) {
+            break; // End of extended tags
+        }
 
-// Parse extension packet
-function parseExtensionPacket(buffer) {
-    return {
-        tags: {},
-        parameters: {},
-        packetType: 'Extension Packet',
-        rawData: buffer.toString('hex').toUpperCase(),
-        message: 'Extension packet - raw data only'
-    };
-}
+        const tagHex = `0x${tag.toString(16).padStart(4, '0')}`;
+        const definition = tagDefinitions[tagHex];
 
-// Get tag definition
-function getTagDefinition(tagHex) {
-    const tagDefinitions = {
-        // Basic Device Information
-        '0x01': { name: 'Hardware Version', type: 'uint8', length: 1, description: 'Hardware version of the device' },
-        '0x02': { name: 'Firmware Version', type: 'uint8', length: 1, description: 'Firmware version of the device' },
-        '0x03': { name: 'IMEI', type: 'string', length: 15, description: 'IMEI number of the device' },
-        '0x04': { name: 'Device Identifier', type: 'uint16', length: 2, description: 'Identifier of the device' },
-        
-        // Archive and Time Information
-        '0x10': { name: 'Archive Record Number', type: 'uint16', length: 2, description: 'Sequential number of archive record' },
-        '0x20': { name: 'Date Time', type: 'datetime', length: 4, description: 'Date and time in Unix timestamp format' },
-        '0x21': { name: 'Milliseconds', type: 'uint16', length: 2, description: 'Milliseconds (0-999) to complete date and time value' },
-        
-        // Location and Navigation
-        '0x30': { name: 'Coordinates', type: 'coordinates', length: 9, description: 'GPS/GLONASS coordinates and satellites info' },
-        '0x33': { name: 'Speed and Direction', type: 'speedDirection', length: 4, description: 'Speed in km/h and direction in degrees' },
-        '0x34': { name: 'Height', type: 'int16', length: 2, description: 'Height above sea level in meters' },
-        '0x35': { name: 'HDOP', type: 'uint8', length: 1, description: 'HDOP or cellular location error in meters' },
-        
-        // Device Status
-        '0x40': { name: 'Status', type: 'status', length: 2, description: 'Device status bits' },
-        '0x41': { name: 'Supply Voltage', type: 'uint16', length: 2, description: 'Supply voltage in mV' },
-        '0x42': { name: 'Battery Voltage', type: 'uint16', length: 2, description: 'Battery voltage in mV' },
-        '0x43': { name: 'Inside Temperature', type: 'int8', length: 1, description: 'Internal temperature in °C' },
-        '0x44': { name: 'Acceleration', type: 'uint32', length: 4, description: 'Acceleration' },
-        '0x45': { name: 'Status of outputs', type: 'outputs', length: 2, description: 'Status of outputs' },
-        '0x46': { name: 'Status of inputs', type: 'inputs', length: 2, description: 'Status of inputs' },
-        '0x47': { name: 'ECO and driving style', type: 'uint32', length: 4, description: 'ECO and driving style' },
-        '0x48': { name: 'Expanded status of the device', type: 'uint16', length: 2, description: 'Expanded status of the device' },
-        '0x49': { name: 'Transmission channel', type: 'uint8', length: 1, description: 'Transmission channel' },
-        
-        // Input voltages
-        '0x50': { name: 'Input voltage 0', type: 'uint16', length: 2, description: 'Input voltage 0' },
-        '0x51': { name: 'Input voltage 1', type: 'uint16', length: 2, description: 'Input voltage 1' },
-        '0x52': { name: 'Input voltage 2', type: 'uint16', length: 2, description: 'Input voltage 2' },
-        '0x53': { name: 'Input voltage 3', type: 'uint16', length: 2, description: 'Input voltage 3' },
-        '0x54': { name: 'Input 4 Values', type: 'uint16', length: 2, description: 'Input 4 Values' },
-        '0x55': { name: 'Input 5 Values', type: 'uint16', length: 2, description: 'Input 5 Values' },
-        '0x56': { name: 'Input 6 Values', type: 'uint16', length: 2, description: 'Input 6 Values' },
-        '0x57': { name: 'Input 7 Values', type: 'uint16', length: 2, description: 'Input 7 Values' },
-        '0x58': { name: 'RS232 0', type: 'uint16', length: 2, description: 'RS232 0' },
-        '0x59': { name: 'RS232 1', type: 'uint16', length: 2, description: 'RS232 1' },
-        
-        // GSM Information
-        '0x60': { name: 'GSM Network Code', type: 'uint32', length: 4, description: 'GSM network code (extended)' },
-        '0x61': { name: 'GSM Location Area Code', type: 'uint32', length: 4, description: 'GSM location area code (extended)' },
-        '0x62': { name: 'GSM Signal Level', type: 'uint8', length: 1, description: 'GSM signal level (0-31)' },
-        '0x63': { name: 'GSM Cell ID', type: 'uint16', length: 2, description: 'GSM cell identifier' },
-        '0x64': { name: 'GSM Area Code', type: 'uint16', length: 2, description: 'GSM area code' },
-        '0x65': { name: 'GSM Operator Code', type: 'uint16', length: 2, description: 'GSM operator code' },
-        '0x66': { name: 'GSM Base Station', type: 'uint16', length: 2, description: 'GSM base station identifier' },
-        '0x67': { name: 'GSM Country Code', type: 'uint16', length: 2, description: 'GSM country code' },
-        '0x68': { name: 'GSM Network Code', type: 'uint16', length: 2, description: 'GSM network code' },
-        '0x69': { name: 'GSM Location Area Code', type: 'uint16', length: 2, description: 'GSM location area code' },
-        
-        // Sensors
-        '0x73': { name: 'Temperature Sensor', type: 'int16', length: 2, description: 'Temperature sensor reading in °C' },
-        '0x74': { name: 'Humidity Sensor', type: 'uint8', length: 1, description: 'Humidity sensor reading in %' },
-        '0x75': { name: 'Pressure Sensor', type: 'uint16', length: 2, description: 'Pressure sensor reading in hPa' },
-        '0x76': { name: 'Light Sensor', type: 'uint16', length: 2, description: 'Light sensor reading in lux' },
-        '0x77': { name: 'Accelerometer', type: 'int16', length: 2, description: 'Accelerometer readings (X, Y, Z) in m/s²' },
-        
-        // User data
-        '0xe2': { name: 'User data 0', type: 'uint32', length: 4, description: 'User data 0' },
-        '0xe3': { name: 'User data 1', type: 'uint32', length: 4, description: 'User data 1' },
-        '0xe4': { name: 'User data 2', type: 'uint32', length: 4, description: 'User data 2' },
-        '0xe5': { name: 'User data 3', type: 'uint32', length: 4, description: 'User data 3' },
-        '0xe6': { name: 'User data 4', type: 'uint32', length: 4, description: 'User data 4' },
-        '0xe7': { name: 'User data 5', type: 'uint32', length: 4, description: 'User data 5' },
-        '0xe8': { name: 'User data 6', type: 'uint32', length: 4, description: 'User data 6' },
-        '0xe9': { name: 'User data 7', type: 'uint32', length: 4, description: 'User data 7' }
-    };
-    
-    return tagDefinitions[tagHex];
-}
+        if (!definition) {
+            console.warn(`Unknown extended tag: ${tagHex}`);
+            continue;
+        }
 
-// Parse tag value based on type
-function parseTagValue(buffer, offset, tagDef) {
-    const tag = buffer.readUInt8(offset);
-    offset++; // Skip tag byte
-    
-    try {
         let value;
-        let bytesRead = 0;
-
-        switch (tagDef.type) {
+        switch (definition.type) {
             case 'uint8':
-                value = buffer.readUInt8(offset);
-                bytesRead = 1;
+                value = buffer.readUInt8(currentOffset);
+                currentOffset += 1;
                 break;
-
             case 'uint16':
-                value = buffer.readUInt16LE(offset);
-                bytesRead = 2;
+                value = buffer.readUInt16LE(currentOffset);
+                currentOffset += 2;
                 break;
-
             case 'uint32':
-                value = buffer.readUInt32LE(offset);
-                bytesRead = 4;
+                value = buffer.readUInt32LE(currentOffset);
+                currentOffset += 4;
                 break;
-
+            case 'uint32_modbus':
+                value = buffer.readUInt32LE(currentOffset)/100;
+                currentOffset += 4;
+                break;
             case 'int8':
-                value = buffer.readInt8(offset);
-                bytesRead = 1;
+                value = buffer.readInt8(currentOffset);
+                currentOffset += 1;
                 break;
-
             case 'int16':
-                value = buffer.readInt16LE(offset);
-                bytesRead = 2;
+                value = buffer.readInt16LE(currentOffset);
+                currentOffset += 2;
                 break;
-
             case 'int32':
-                value = buffer.readInt32LE(offset);
-                bytesRead = 4;
+                value = buffer.readInt32LE(currentOffset);
+                currentOffset += 4;
                 break;
-
             case 'string':
-                if (tagDef.length) {
-                    value = buffer.slice(offset, offset + tagDef.length).toString('ascii');
-                    bytesRead = tagDef.length;
-                } else {
-                    const strLength = buffer.readUInt8(offset);
-                    value = buffer.slice(offset + 1, offset + 1 + strLength).toString('ascii');
-                    bytesRead = strLength + 1;
-                }
+                value = buffer.toString('utf8', currentOffset, currentOffset + definition.length);
+                currentOffset += definition.length;
                 break;
-
-            case 'coordinates':
-                const satellites = buffer.readUInt8(offset) & 0x0F;
-                const correctness = (buffer.readUInt8(offset) >> 4) & 0x0F;
-                const lat = buffer.readInt32LE(offset + 1) / 1000000;
-                const lon = buffer.readInt32LE(offset + 5) / 1000000;
-                value = { 
-                    latitude: lat, 
-                    longitude: lon, 
-                    satellites,
-                    correctness,
-                    source: correctness === 0 ? 'GPS/GLONASS' : 
-                           correctness === 2 ? 'Cellular' : 'Unknown'
-                };
-                bytesRead = 9;
-                break;
-
-            case 'speedDirection':
-                const speed = buffer.readUInt16LE(offset) / 10; // Convert to km/h
-                const direction = buffer.readUInt16LE(offset + 2);
-                value = { speed, direction };
-                bytesRead = 4;
-                break;
-
             case 'datetime':
-                value = new Date(buffer.readUInt32LE(offset) * 1000);
-                bytesRead = 4;
+                value = new Date(buffer.readUInt32LE(currentOffset) * 1000);
+                currentOffset += 4;
                 break;
-
+            case 'coordinates':
+                const satellites = buffer.readUInt8(currentOffset) & 0x0F;
+                const correctness = (buffer.readUInt8(currentOffset) >> 4) & 0x0F;
+                currentOffset++;
+                const lat = buffer.readInt32LE(currentOffset) / 1000000;
+                currentOffset += 4;
+                const lon = buffer.readInt32LE(currentOffset) / 1000000;
+                currentOffset += 4;
+                value = { latitude: lat, longitude: lon, satellites, correctness };
+                break;
             case 'status':
-                value = buffer.readUInt16LE(offset);
-                bytesRead = 2;
+                value = buffer.readUInt16LE(currentOffset);
+                currentOffset += 2;
                 break;
-
             case 'outputs':
-                value = buffer.readUInt16LE(offset);
-                bytesRead = 2;
-                break;
-
-            case 'inputs':
-                value = buffer.readUInt16LE(offset);
-                bytesRead = 2;
-                break;
-
-            default:
-                // For unknown types, try to read as many bytes as specified
-                if (tagDef.length && offset + tagDef.length <= buffer.length) {
-                    value = buffer.slice(offset, offset + tagDef.length).toString('hex').toUpperCase();
-                    bytesRead = tagDef.length;
-                } else {
-                    return [null, offset];
+                const outputsValue = buffer.readUInt16LE(currentOffset);
+                const outputsBinary = outputsValue.toString(2).padStart(16, '0');
+                value = {
+                    raw: outputsValue,
+                    binary: outputsBinary,
+                    states: {}
+                };
+                for (let i = 0; i < 16; i++) {
+                    value.states[`output${i}`] = outputsBinary[15 - i] === '1';
                 }
+                currentOffset += 2;
+                break;
+            case 'inputs':
+                const inputsValue = buffer.readUInt16LE(currentOffset);
+                const inputsBinary = inputsValue.toString(2).padStart(16, '0');
+                value = {
+                    raw: inputsValue,
+                    binary: inputsBinary,
+                    states: {}
+                };
+                for (let i = 0; i < 16; i++) {
+                    value.states[`input${i}`] = inputsBinary[15 - i] === '1';
+                }
+                currentOffset += 2;
+                break;
+            case 'speedDirection':
+                const speedValue = buffer.readUInt16LE(currentOffset);
+                const directionValue = buffer.readUInt16LE(currentOffset + 2);
+                value = {
+                    speed: speedValue / 10,
+                    direction: directionValue / 10
+                };
+                currentOffset += 4;
+                break;
+            default:
+                console.warn(`Unsupported extended tag type: ${definition.type}`);
+                currentOffset += definition.length || 1;
+                value = null;
         }
 
-        return [value, offset + bytesRead];
+        extendedTags[tagHex] = {
+            value: value,
+            type: definition.type,
+            description: definition.description
+        };
+    }
 
+    return [extendedTags, currentOffset];
+}
+
+// Parse main packet following parser.js implementation
+async function parseMainPacket(buffer, offset = 0, actualLength) {
+    try {
+        const result = {
+            header: buffer.readUInt8(offset),
+            length: actualLength,
+            rawLength: actualLength,
+            records: []
+        };
+
+        let currentOffset = offset + 3;
+        const endOffset = offset + actualLength;
+
+        if (actualLength < 32) {
+            // Single record packet
+            const record = { tags: {} };
+            let recordOffset = currentOffset;
+
+            while (recordOffset < endOffset - 2) {
+                const tag = buffer.readUInt8(recordOffset);
+                recordOffset++;
+
+                if (tag === 0xFE) {
+                    const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
+                    Object.assign(record.tags, extendedTags);
+                    recordOffset = newOffset;
+                    continue;
+                }
+
+                const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+                const definition = tagDefinitions[tagHex];
+
+                if (!definition) {
+                    console.warn(`Unknown tag: ${tagHex}`);
+                    continue;
+                }
+
+                let value;
+                switch (definition.type) {
+                    case 'uint8':
+                        value = buffer.readUInt8(recordOffset);
+                        recordOffset += 1;
+                        break;
+                    case 'uint16':
+                        value = buffer.readUInt16LE(recordOffset);
+                        recordOffset += 2;
+                        break;
+                    case 'uint32':
+                        value = buffer.readUInt32LE(recordOffset);
+                        recordOffset += 4;
+                        break;
+                    case 'uint32_modbus':
+                        value = buffer.readUInt32LE(recordOffset)/100;
+                        recordOffset += 4;
+                        break;
+                    case 'int8':
+                        value = buffer.readInt8(recordOffset);
+                        recordOffset += 1;
+                        break;
+                    case 'int16':
+                        value = buffer.readInt16LE(recordOffset);
+                        recordOffset += 2;
+                        break;
+                    case 'int32':
+                        value = buffer.readInt32LE(recordOffset);
+                        recordOffset += 4;
+                        break;
+                    case 'string':
+                        value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                        recordOffset += definition.length;
+                        break;
+                    case 'datetime':
+                        value = new Date(buffer.readUInt32LE(recordOffset) * 1000);
+                        recordOffset += 4;
+                        break;
+                    case 'coordinates':
+                        const satellites = buffer.readUInt8(recordOffset) & 0x0F;
+                        const correctness = (buffer.readUInt8(recordOffset) >> 4) & 0x0F;
+                        recordOffset++;
+                        const lat = buffer.readInt32LE(recordOffset) / 1000000;
+                        recordOffset += 4;
+                        const lon = buffer.readInt32LE(recordOffset) / 1000000;
+                        recordOffset += 4;
+                        value = { latitude: lat, longitude: lon, satellites, correctness };
+                        break;
+                    case 'status':
+                        value = buffer.readUInt16LE(recordOffset);
+                        recordOffset += 2;
+                        break;
+                    case 'outputs':
+                        const outputsValue = buffer.readUInt16LE(recordOffset);
+                        const outputsBinary = outputsValue.toString(2).padStart(16, '0');
+                        value = {
+                            raw: outputsValue,
+                            binary: outputsBinary,
+                            states: {}
+                        };
+                        for (let i = 0; i < 16; i++) {
+                            value.states[`output${i}`] = outputsBinary[15 - i] === '1';
+                        }
+                        recordOffset += 2;
+                        break;
+                    case 'inputs':
+                        const inputsValue = buffer.readUInt16LE(recordOffset);
+                        const inputsBinary = inputsValue.toString(2).padStart(16, '0');
+                        value = {
+                            raw: inputsValue,
+                            binary: inputsBinary,
+                            states: {}
+                        };
+                        for (let i = 0; i < 16; i++) {
+                            value.states[`input${i}`] = inputsBinary[15 - i] === '1';
+                        }
+                        recordOffset += 2;
+                        break;
+                    case 'speedDirection':
+                        const speedValue = buffer.readUInt16LE(recordOffset);
+                        const directionValue = buffer.readUInt16LE(recordOffset + 2);
+                        value = {
+                            speed: speedValue / 10,
+                            direction: directionValue / 10
+                        };
+                        recordOffset += 4;
+                        break;
+                    default:
+                        console.warn(`Unsupported tag type: ${definition.type}`);
+                        recordOffset += definition.length || 1;
+                        value = null;
+                }
+
+                record.tags[tagHex] = {
+                    value: value,
+                    type: definition.type,
+                    description: definition.description
+                };
+
+                if (tagHex === '0x03' && definition.type === 'string') {
+                    lastIMEI = value;
+                }
+            }
+
+            if (Object.keys(record.tags).length > 0) {
+                result.records.push(record);
+            }
+        } else {
+            // For packets >= 32 bytes, check if there's a 0x10 tag (Number Archive Records)
+            let hasMultipleRecords = false;
+            let searchOffset = currentOffset;
+            
+            // Look for 0x10 tag to determine if this is a single record or multiple records
+            while (searchOffset < endOffset - 2) {
+                if (buffer.readUInt8(searchOffset) === 0x10) {
+                    hasMultipleRecords = true;
+                    break;
+                }
+                searchOffset++;
+            }
+
+            console.log('Packet analysis:', {
+                actualLength,
+                hasMultipleRecords,
+                searchOffset: searchOffset - currentOffset,
+                timestamp: new Date().toISOString()
+            });
+
+            if (hasMultipleRecords) {
+                // Multiple records - look for 0x10 tags
+                while (currentOffset < endOffset - 2) {
+                    if (buffer.readUInt8(currentOffset) !== 0x10) {
+                        currentOffset++;
+                        continue;
+                    }
+
+                    const record = { tags: {} };
+                    let recordOffset = currentOffset;
+
+                    while (recordOffset < endOffset - 2) {
+                        const tag = buffer.readUInt8(recordOffset);
+                        recordOffset++;
+
+                        if (tag === 0x10 && recordOffset > currentOffset + 1) {
+                            recordOffset--;
+                            break;
+                        }
+
+                        if (tag === 0xFE) {
+                            const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
+                            Object.assign(record.tags, extendedTags);
+                            recordOffset = newOffset;
+                            continue;
+                        }
+
+                        const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+                        const definition = tagDefinitions[tagHex];
+
+                        if (!definition) {
+                            console.warn(`Unknown tag: ${tagHex}`);
+                            continue;
+                        }
+
+                        let value;
+                        switch (definition.type) {
+                            case 'uint8':
+                                value = buffer.readUInt8(recordOffset);
+                                recordOffset += 1;
+                                break;
+                            case 'uint16':
+                                value = buffer.readUInt16LE(recordOffset);
+                                recordOffset += 2;
+                                break;
+                            case 'uint32':
+                                value = buffer.readUInt32LE(recordOffset);
+                                recordOffset += 4;
+                                break;
+                            case 'uint32_modbus':
+                                value = buffer.readUInt32LE(recordOffset)/100;
+                                recordOffset += 4;
+                                break;
+                            case 'int8':
+                                value = buffer.readInt8(recordOffset);
+                                recordOffset += 1;
+                                break;
+                            case 'int16':
+                                value = buffer.readInt16LE(recordOffset);
+                                recordOffset += 2;
+                                break;
+                            case 'int32':
+                                value = buffer.readInt32LE(recordOffset);
+                                recordOffset += 4;
+                                break;
+                            case 'string':
+                                value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                                recordOffset += definition.length;
+                                break;
+                            case 'datetime':
+                                value = new Date(buffer.readUInt32LE(recordOffset) * 1000);
+                                recordOffset += 4;
+                                break;
+                            case 'coordinates':
+                                const satellites = buffer.readUInt8(recordOffset) & 0x0F;
+                                const correctness = (buffer.readUInt8(recordOffset) >> 4) & 0x0F;
+                                recordOffset++;
+                                const lat = buffer.readInt32LE(recordOffset) / 1000000;
+                                recordOffset += 4;
+                                const lon = buffer.readInt32LE(recordOffset) / 1000000;
+                                recordOffset += 4;
+                                value = { latitude: lat, longitude: lon, satellites, correctness };
+                                break;
+                            case 'status':
+                                value = buffer.readUInt16LE(recordOffset);
+                                recordOffset += 2;
+                                break;
+                            case 'outputs':
+                                const outputsValue = buffer.readUInt16LE(recordOffset);
+                                const outputsBinary = outputsValue.toString(2).padStart(16, '0');
+                                value = {
+                                    raw: outputsValue,
+                                    binary: outputsBinary,
+                                    states: {}
+                                };
+                                for (let i = 0; i < 16; i++) {
+                                    value.states[`output${i}`] = outputsBinary[15 - i] === '1';
+                                }
+                                recordOffset += 2;
+                                break;
+                            case 'inputs':
+                                const inputsValue = buffer.readUInt16LE(recordOffset);
+                                const inputsBinary = inputsValue.toString(2).padStart(16, '0');
+                                value = {
+                                    raw: inputsValue,
+                                    binary: inputsBinary,
+                                    states: {}
+                                };
+                                for (let i = 0; i < 16; i++) {
+                                    value.states[`input${i}`] = inputsBinary[15 - i] === '1';
+                                }
+                                recordOffset += 2;
+                                break;
+                            case 'speedDirection':
+                                const speedValue = buffer.readUInt16LE(recordOffset);
+                                const directionValue = buffer.readUInt16LE(recordOffset + 2);
+                                value = {
+                                    speed: speedValue / 10,
+                                    direction: directionValue / 10
+                                };
+                                recordOffset += 4;
+                                break;
+                            default:
+                                console.warn(`Unsupported tag type: ${definition.type}`);
+                                recordOffset += definition.length || 1;
+                                value = null;
+                        }
+
+                        record.tags[tagHex] = {
+                            value: value,
+                            type: definition.type,
+                            description: definition.description
+                        };
+
+                        if (tagHex === '0x03' && definition.type === 'string') {
+                            lastIMEI = value;
+                        }
+                    }
+
+                    if (Object.keys(record.tags).length > 0) {
+                        result.records.push(record);
+                    }
+
+                    currentOffset = recordOffset;
+                }
+            } else {
+                // Single record - parse directly from currentOffset
+                console.log('Processing single record packet');
+                const record = { tags: {} };
+                let recordOffset = currentOffset;
+
+                while (recordOffset < endOffset - 2) {
+                    const tag = buffer.readUInt8(recordOffset);
+                    recordOffset++;
+
+                    if (tag === 0xFE) {
+                        const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
+                        Object.assign(record.tags, extendedTags);
+                        recordOffset = newOffset;
+                        continue;
+                    }
+
+                    const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+                    const definition = tagDefinitions[tagHex];
+
+                    if (!definition) {
+                        console.warn(`Unknown tag: ${tagHex}`);
+                        continue;
+                    }
+
+                    let value;
+                    switch (definition.type) {
+                        case 'uint8':
+                            value = buffer.readUInt8(recordOffset);
+                            recordOffset += 1;
+                            break;
+                        case 'uint16':
+                            value = buffer.readUInt16LE(recordOffset);
+                            recordOffset += 2;
+                            break;
+                        case 'uint32':
+                            value = buffer.readUInt32LE(recordOffset);
+                            recordOffset += 4;
+                            break;
+                        case 'uint32_modbus':
+                            value = buffer.readUInt32LE(recordOffset)/100;
+                            recordOffset += 4;
+                            break;
+                        case 'int8':
+                            value = buffer.readInt8(recordOffset);
+                            recordOffset += 1;
+                            break;
+                        case 'int16':
+                            value = buffer.readInt16LE(recordOffset);
+                            recordOffset += 2;
+                            break;
+                        case 'int32':
+                            value = buffer.readInt32LE(recordOffset);
+                            recordOffset += 4;
+                            break;
+                        case 'string':
+                            value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                            recordOffset += definition.length;
+                            break;
+                        case 'datetime':
+                            value = new Date(buffer.readUInt32LE(recordOffset) * 1000);
+                            recordOffset += 4;
+                            break;
+                        case 'coordinates':
+                            const satellites = buffer.readUInt8(recordOffset) & 0x0F;
+                            const correctness = (buffer.readUInt8(recordOffset) >> 4) & 0x0F;
+                            recordOffset++;
+                            const lat = buffer.readInt32LE(recordOffset) / 1000000;
+                            recordOffset += 4;
+                            const lon = buffer.readInt32LE(recordOffset) / 1000000;
+                            recordOffset += 4;
+                            value = { latitude: lat, longitude: lon, satellites, correctness };
+                            break;
+                        case 'status':
+                            value = buffer.readUInt16LE(recordOffset);
+                            recordOffset += 2;
+                            break;
+                        case 'outputs':
+                            const outputsValue = buffer.readUInt16LE(recordOffset);
+                            const outputsBinary = outputsValue.toString(2).padStart(16, '0');
+                            value = {
+                                raw: outputsValue,
+                                binary: outputsBinary,
+                                states: {}
+                            };
+                            for (let i = 0; i < 16; i++) {
+                                value.states[`output${i}`] = outputsBinary[15 - i] === '1';
+                            }
+                            recordOffset += 2;
+                            break;
+                        case 'inputs':
+                            const inputsValue = buffer.readUInt16LE(recordOffset);
+                            const inputsBinary = inputsValue.toString(2).padStart(16, '0');
+                            value = {
+                                raw: inputsValue,
+                                binary: inputsBinary,
+                                states: {}
+                            };
+                            for (let i = 0; i < 16; i++) {
+                                value.states[`input${i}`] = inputsBinary[15 - i] === '1';
+                            }
+                            recordOffset += 2;
+                            break;
+                        case 'speedDirection':
+                            const speedValue = buffer.readUInt16LE(recordOffset);
+                            const directionValue = buffer.readUInt16LE(recordOffset + 2);
+                            value = {
+                                speed: speedValue / 10,
+                                direction: directionValue / 10
+                            };
+                            recordOffset += 4;
+                            break;
+                        default:
+                            console.warn(`Unsupported tag type: ${definition.type}`);
+                            recordOffset += definition.length || 1;
+                            value = null;
+                    }
+
+                    record.tags[tagHex] = {
+                        value: value,
+                        type: definition.type,
+                        description: definition.description
+                    };
+
+                    if (tagHex === '0x03' && definition.type === 'string') {
+                        lastIMEI = value;
+                    }
+                }
+
+                if (Object.keys(record.tags).length > 0) {
+                    result.records.push(record);
+                }
+            }
+        }
+
+        return result;
     } catch (error) {
-        return [null, offset];
+        console.error('Error parsing main packet:', error);
+        throw error;
+    }
+}
+
+// Parse ignorable packet
+async function parseIgnorablePacket(buffer) {
+    return {
+        type: 'ignorable',
+        header: buffer.readUInt8(0),
+        length: buffer.readUInt16LE(1),
+        raw: buffer
+    };
+}
+
+// Main packet parsing function
+async function parsePacket(buffer) {
+    try {
+        if (!Buffer.isBuffer(buffer)) {
+            throw new Error('Input must be a buffer');
+        }
+
+        console.log('Raw packet data:', buffer.toString('hex'));
+
+        if (buffer.length < 3) {
+            throw new Error('Packet too short');
+        }
+
+        const header = buffer.readUInt8(0);
+        
+        // Validate packet structure and checksum
+        const { hasUnsentData, actualLength, rawLength } = validatePacket(buffer);
+        
+        // Use PacketTypeHandler to determine packet type
+        if (PacketTypeHandler.isMainPacket(header)) {
+            // This is a Head Packet or Main Packet
+            const result = await parseMainPacket(buffer, 0, actualLength);
+            result.hasUnsentData = hasUnsentData;
+            result.actualLength = actualLength;
+            result.rawLength = rawLength;
+            return result;
+        } else if (PacketTypeHandler.isIgnorablePacket(header)) {
+            // This is an ignorable packet, just needs confirmation
+            return await parseIgnorablePacket(buffer);
+        } else {
+            // This is an extension packet
+            return {
+                type: 'extension',
+                header: header,
+                length: buffer.readUInt16LE(1),
+                hasUnsentData,
+                actualLength,
+                rawLength,
+                raw: buffer
+            };
+        }
+    } catch (error) {
+        console.error('Parsing error:', error);
+        throw error;
     }
 }
 
@@ -688,7 +963,7 @@ function handleConnection(socket) {
 
                 try {
                     // Parse the packet
-                    const parsedPacket = parsePacketData(packet);
+                    const parsedPacket = await parsePacket(packet);
                     
                     // Get the checksum from the received packet
                     const packetChecksum = packet.readUInt16LE(packet.length - 2);
