@@ -530,6 +530,69 @@
         .btn-secondary:hover {
             background: #545b62;
         }
+
+        /* Foldable Sections */
+        .foldable-section {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .foldable-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e9ecef;
+            transition: background-color 0.3s ease;
+        }
+
+        .foldable-header:hover {
+            background: #e9ecef;
+        }
+
+        .foldable-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .foldable-icon {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+            color: #6c757d;
+        }
+
+        .foldable-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .foldable-content {
+            background: white;
+            padding: 15px;
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .foldable-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        /* Map container specific styling */
+        .map-container.foldable-section {
+            grid-column: 1 / -1;
+        }
+
+        .map-container .foldable-content {
+            padding: 15px;
+        }
     </style>
 </head>
 <body>
@@ -552,97 +615,127 @@
         </div>
 
         <div class="main-content">
-            <div class="panel">
-                <h3>📊 Live Statistics</h3>
-                <div class="stats">
-                    <div class="stat-item">
-                        <div id="packetCount" class="stat-value">0</div>
-                        <div class="stat-label">Packets Received</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="deviceCount" class="stat-value">0</div>
-                        <div class="stat-label">Devices</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="lastUpdate" class="stat-value">--</div>
-                        <div class="stat-label">Last Update</div>
+            <!-- Live Statistics -->
+            <div class="foldable-section">
+                <div class="foldable-header" onclick="toggleSection('stats')">
+                    <h3 class="foldable-title">📊 Live Statistics</h3>
+                    <span class="foldable-icon" id="stats-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="stats-content">
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div id="packetCount" class="stat-value">0</div>
+                            <div class="stat-label">Packets Received</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="deviceCount" class="stat-value">0</div>
+                            <div class="stat-label">Devices</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="lastUpdate" class="stat-value">--</div>
+                            <div class="stat-label">Last Update</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <h3>📍 Current Location</h3>
-                <div class="data-grid">
-                    <div class="data-item">
-                        <div class="data-label">Device ID</div>
-                        <div id="deviceId" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Coordinates</div>
-                        <div id="coordinates" class="data-value coordinates">No GPS data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Speed</div>
-                        <div id="speed" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Direction</div>
-                        <div id="direction" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Height</div>
-                        <div id="height" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Satellites</div>
-                        <div id="satellites" class="data-value">No data</div>
+            <!-- Current Location -->
+            <div class="foldable-section">
+                <div class="foldable-header" onclick="toggleSection('location')">
+                    <h3 class="foldable-title">📍 Current Location</h3>
+                    <span class="foldable-icon" id="location-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="location-content">
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <div class="data-label">Device ID</div>
+                            <div id="deviceId" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Coordinates</div>
+                            <div id="coordinates" class="data-value coordinates">No GPS data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Speed</div>
+                            <div id="speed" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Direction</div>
+                            <div id="direction" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Height</div>
+                            <div id="height" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Satellites</div>
+                            <div id="satellites" class="data-value">No data</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <h3>🔋 Device Status</h3>
-                <div class="data-grid">
-                    <div class="data-item">
-                        <div class="data-label">Supply Voltage</div>
-                        <div id="supplyVoltage" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Battery Voltage</div>
-                        <div id="batteryVoltage" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Temperature</div>
-                        <div id="temperature" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Status</div>
-                        <div id="status" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">Packet Type</div>
-                        <div id="packetType" class="data-value">No data</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="data-label">IMEI</div>
-                        <div id="imei" class="data-value">No data</div>
+            <!-- Device Status -->
+            <div class="foldable-section">
+                <div class="foldable-header" onclick="toggleSection('status')">
+                    <h3 class="foldable-title">🔋 Device Status</h3>
+                    <span class="foldable-icon" id="status-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="status-content">
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <div class="data-label">Supply Voltage</div>
+                            <div id="supplyVoltage" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Battery Voltage</div>
+                            <div id="batteryVoltage" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Temperature</div>
+                            <div id="temperature" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Status</div>
+                            <div id="status" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Packet Type</div>
+                            <div id="packetType" class="data-value">No data</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">IMEI</div>
+                            <div id="imei" class="data-value">No data</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="parameters-panel">
-                <h3>📋 All Parameters</h3>
-                <div id="parametersContainer">
-                    <div class="no-data">No parameters received yet</div>
+            <!-- All Parameters -->
+            <div class="foldable-section">
+                <div class="foldable-header" onclick="toggleSection('parameters')">
+                    <h3 class="foldable-title">📋 All Parameters</h3>
+                    <span class="foldable-icon" id="parameters-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="parameters-content">
+                    <div id="parametersContainer">
+                        <div class="no-data">No parameters received yet</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="map-container">
-                <h3>🗺️ Live Map</h3>
-                <div id="map">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading map...
+            <!-- Live Map -->
+            <div class="map-container foldable-section">
+                <div class="foldable-header" onclick="toggleSection('map')">
+                    <h3 class="foldable-title">🗺️ Live Map</h3>
+                    <span class="foldable-icon" id="map-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="map-content">
+                    <div id="map">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading map...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -700,6 +793,7 @@
         function init() {
             loadMap();
             startPolling();
+            initializeFoldableSections();
         }
 
         // Load OpenStreetMap
@@ -1124,6 +1218,52 @@
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('timePeriod').addEventListener('change', handleTimePeriodChange);
         });
+
+        // Toggle foldable sections
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const icon = document.getElementById(sectionId + '-icon');
+            
+            if (content.classList.contains('collapsed')) {
+                // Expand section
+                content.classList.remove('collapsed');
+                icon.classList.remove('collapsed');
+                icon.textContent = '▼';
+            } else {
+                // Collapse section
+                content.classList.add('collapsed');
+                icon.classList.add('collapsed');
+                icon.textContent = '▶';
+            }
+            
+            // Save the state
+            saveFoldableState();
+        }
+
+        // Initialize foldable sections state (optional: remember user preferences)
+        function initializeFoldableSections() {
+            // You can add localStorage to remember user preferences
+            const savedState = localStorage.getItem('foldableSections');
+            if (savedState) {
+                const state = JSON.parse(savedState);
+                Object.keys(state).forEach(sectionId => {
+                    if (!state[sectionId]) { // If section was collapsed
+                        toggleSection(sectionId);
+                    }
+                });
+            }
+        }
+
+        // Save foldable sections state
+        function saveFoldableState() {
+            const sections = ['stats', 'location', 'status', 'parameters', 'map'];
+            const state = {};
+            sections.forEach(sectionId => {
+                const content = document.getElementById(sectionId + '-content');
+                state[sectionId] = !content.classList.contains('collapsed');
+            });
+            localStorage.setItem('foldableSections', JSON.stringify(state));
+        }
     </script>
 </body>
 </html> 
