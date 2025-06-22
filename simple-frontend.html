@@ -401,6 +401,135 @@
             color: #6c757d;
             margin-top: 3px;
         }
+
+        /* LED Status Indicators */
+        .led-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .led-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.75em;
+        }
+
+        .led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .led.on {
+            background: #28a745;
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+        }
+
+        .led.off {
+            background: #dc3545;
+            box-shadow: 0 0 5px rgba(220, 53, 69, 0.3);
+        }
+
+        .led-label {
+            font-size: 0.7em;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        /* Download Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .modal-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 0.9em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
     </style>
 </head>
 <body>
@@ -416,7 +545,7 @@
                 <span id="statusText">Disconnected</span>
             </div>
             <div class="controls">
-                <button class="btn btn-primary" onclick="downloadData()">📥 Download Data</button>
+                <button class="btn btn-primary" onclick="openDownloadModal()">📥 Download Data</button>
                 <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
                 <a href="/api/health" class="btn btn-success" target="_blank">🔧 API Health</a>
             </div>
@@ -516,6 +645,46 @@
                         Loading map...
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Modal -->
+    <div id="downloadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📥 Download Data</span>
+                <span class="close" onclick="closeDownloadModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Time Period:</label>
+                <select id="timePeriod" class="form-control">
+                    <option value="all">All Data</option>
+                    <option value="1h">Last 1 Hour</option>
+                    <option value="6h">Last 6 Hours</option>
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+            <div id="customRange" class="form-group" style="display: none;">
+                <label class="form-label">Start Date & Time:</label>
+                <input type="datetime-local" id="startDate" class="form-control">
+                <label class="form-label">End Date & Time:</label>
+                <input type="datetime-local" id="endDate" class="form-control">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Format:</label>
+                <select id="downloadFormat" class="form-control">
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                    <option value="xlsx">Excel (XLSX)</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="downloadData()">📥 Download</button>
+                <button class="btn btn-secondary" onclick="closeDownloadModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -661,6 +830,7 @@
 
             const parametersHtml = Object.entries(packet.tags).map(([tagHex, tagData]) => {
                 let displayValue = tagData.value;
+                let ledHtml = '';
                 
                 // Format different types of values
                 if (typeof tagData.value === 'object') {
@@ -668,6 +838,34 @@
                         displayValue = `${tagData.value.latitude.toFixed(6)}, ${tagData.value.longitude.toFixed(6)} (${tagData.value.satellites} sats)`;
                     } else if (tagData.type === 'speedDirection') {
                         displayValue = `${tagData.value.speed.toFixed(1)} km/h, ${tagData.value.direction}°`;
+                    } else if (tagData.type === 'outputs') {
+                        displayValue = `Raw: ${tagData.value.raw} (${tagData.value.binary})`;
+                        // Create LED indicators for outputs
+                        ledHtml = '<div class="led-container">';
+                        for (let i = 0; i < 16; i++) {
+                            const isOn = tagData.value.states[`output${i}`];
+                            ledHtml += `
+                                <div class="led-item">
+                                    <div class="led ${isOn ? 'on' : 'off'}"></div>
+                                    <span class="led-label">O${i}</span>
+                                </div>
+                            `;
+                        }
+                        ledHtml += '</div>';
+                    } else if (tagData.type === 'inputs') {
+                        displayValue = `Raw: ${tagData.value.raw} (${tagData.value.binary})`;
+                        // Create LED indicators for inputs
+                        ledHtml = '<div class="led-container">';
+                        for (let i = 0; i < 16; i++) {
+                            const isOn = tagData.value.states[`input${i}`];
+                            ledHtml += `
+                                <div class="led-item">
+                                    <div class="led ${isOn ? 'on' : 'off'}"></div>
+                                    <span class="led-label">I${i}</span>
+                                </div>
+                            `;
+                        }
+                        ledHtml += '</div>';
                     } else {
                         displayValue = JSON.stringify(tagData.value);
                     }
@@ -685,6 +883,7 @@
                     <div class="parameter-item">
                         <div class="parameter-name">${tagData.description} (${tagHex})</div>
                         <div class="parameter-value">${displayValue}</div>
+                        ${ledHtml}
                         <div class="parameter-description">${tagData.type}</div>
                     </div>
                 `;
@@ -720,54 +919,165 @@
             }
         }
 
-        // Download data as JSON
+        // Modal functions
+        function openDownloadModal() {
+            document.getElementById('downloadModal').style.display = 'block';
+            // Set default end date to now
+            const now = new Date();
+            const nowStr = now.toISOString().slice(0, 16);
+            document.getElementById('endDate').value = nowStr;
+            
+            // Set default start date to 1 hour ago
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            const oneHourAgoStr = oneHourAgo.toISOString().slice(0, 16);
+            document.getElementById('startDate').value = oneHourAgoStr;
+        }
+
+        function closeDownloadModal() {
+            document.getElementById('downloadModal').style.display = 'none';
+        }
+
+        // Handle time period change
+        function handleTimePeriodChange() {
+            const timePeriod = document.getElementById('timePeriod').value;
+            const customRange = document.getElementById('customRange');
+            
+            if (timePeriod === 'custom') {
+                customRange.style.display = 'block';
+            } else {
+                customRange.style.display = 'none';
+            }
+        }
+
+        // Download data with options
         async function downloadData() {
             try {
-                const response = await fetch('/api/data/latest?limit=1000');
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Create a comprehensive download with all parameters
-                    const downloadData = data.map(packet => ({
-                        timestamp: packet.timestamp,
-                        deviceId: packet.deviceId,
-                        imei: packet.imei,
-                        packetType: packet.packetType,
-                        header: packet.header,
-                        hasUnsentData: packet.hasUnsentData,
-                        length: packet.length,
-                        rawData: packet.rawData,
-                        // Location data
-                        latitude: packet.latitude,
-                        longitude: packet.longitude,
-                        speed: packet.speed,
-                        direction: packet.direction,
-                        height: packet.height,
-                        satellites: packet.satellites,
-                        // Device status
-                        supplyVoltage: packet.supplyVoltage,
-                        batteryVoltage: packet.batteryVoltage,
-                        temperature: packet.temperature,
-                        status: packet.status,
-                        // All parsed parameters
-                        parameters: packet.parameters,
-                        tags: packet.tags
-                    }));
+                const timePeriod = document.getElementById('timePeriod').value;
+                const format = document.getElementById('downloadFormat').value;
+                let startDate, endDate;
 
-                    const blob = new Blob([JSON.stringify(downloadData, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                // Calculate date range based on selection
+                if (timePeriod === 'custom') {
+                    startDate = new Date(document.getElementById('startDate').value);
+                    endDate = new Date(document.getElementById('endDate').value);
+                } else {
+                    endDate = new Date();
+                    switch (timePeriod) {
+                        case '1h':
+                            startDate = new Date(endDate.getTime() - 60 * 60 * 1000);
+                            break;
+                        case '6h':
+                            startDate = new Date(endDate.getTime() - 6 * 60 * 60 * 1000);
+                            break;
+                        case '24h':
+                            startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+                            break;
+                        case '7d':
+                            startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            break;
+                        case '30d':
+                            startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+                            break;
+                        default: // 'all'
+                            startDate = new Date(0);
+                            break;
+                    }
                 }
+
+                // Get data from API
+                const response = await fetch('/api/data/latest?limit=10000');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                
+                let data = await response.json();
+                
+                // Filter data by date range
+                data = data.filter(packet => {
+                    const packetDate = new Date(packet.timestamp);
+                    return packetDate >= startDate && packetDate <= endDate;
+                });
+
+                // Format data based on selected format
+                let downloadData, filename, mimeType;
+                
+                switch (format) {
+                    case 'json':
+                        downloadData = JSON.stringify(data, null, 2);
+                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                        mimeType = 'application/json';
+                        break;
+                        
+                    case 'csv':
+                        downloadData = convertToCSV(data);
+                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
+                        mimeType = 'text/csv';
+                        break;
+                        
+                    case 'xlsx':
+                        // For XLSX, we'll create a simple CSV-like structure that Excel can open
+                        downloadData = convertToCSV(data);
+                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+                        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                        break;
+                }
+
+                // Download the file
+                const blob = new Blob([downloadData], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                closeDownloadModal();
+                alert(`Data downloaded successfully! (${data.length} records)`);
+                
             } catch (error) {
                 console.error('Error downloading data:', error);
                 alert('Error downloading data. Please try again.');
             }
+        }
+
+        // Convert data to CSV format
+        function convertToCSV(data) {
+            if (!data || data.length === 0) return '';
+            
+            // Get all possible fields from all records
+            const allFields = new Set();
+            data.forEach(record => {
+                Object.keys(record).forEach(key => {
+                    if (key !== 'tags' && key !== 'rawData') {
+                        allFields.add(key);
+                    }
+                });
+            });
+            
+            const fields = Array.from(allFields).sort();
+            const csvRows = [];
+            
+            // Add header
+            csvRows.push(fields.join(','));
+            
+            // Add data rows
+            data.forEach(record => {
+                const row = fields.map(field => {
+                    const value = record[field];
+                    if (value === null || value === undefined) {
+                        return '';
+                    } else if (typeof value === 'string' && value.includes(',')) {
+                        return `"${value}"`;
+                    } else {
+                        return value;
+                    }
+                });
+                csvRows.push(row.join(','));
+            });
+            
+            return csvRows.join('\n');
         }
 
         // Clear stored data
@@ -809,6 +1119,11 @@
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', init);
+        
+        // Add event listener for time period change
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('timePeriod').addEventListener('change', handleTimePeriodChange);
+        });
     </script>
 </body>
 </html> 
