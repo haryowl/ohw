@@ -494,12 +494,24 @@
         function updateUI(data) {
             if (!data || !data.length) return;
 
-            const latestPacket = data[data.length - 1];
+            // Get the most recent packet with actual data (not just IMEI)
+            let latestPacket = data[0]; // Start with the first (most recent) packet
+            
+            // Look for a packet with actual coordinates or other meaningful data
+            for (let i = 0; i < data.length; i++) {
+                const packet = data[i];
+                if (packet.latitude !== null && packet.longitude !== null) {
+                    latestPacket = packet;
+                    break;
+                }
+            }
+            
             lastData = latestPacket;
             
             // Debug logging
             console.log('Frontend received data:', {
                 packetCount: data.length,
+                selectedPacketIndex: data.indexOf(latestPacket),
                 latestPacket: {
                     deviceId: latestPacket.deviceId,
                     imei: latestPacket.imei,
