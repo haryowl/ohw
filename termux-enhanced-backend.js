@@ -310,6 +310,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 const tag = buffer.readUInt8(recordOffset);
                 recordOffset++;
 
+                console.log('Found tag:', `0x${tag.toString(16).padStart(2, '0')}`);
+
                 if (tag === 0xFE) {
                     const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
                     Object.assign(record.tags, extendedTags);
@@ -470,6 +472,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                         const tag = buffer.readUInt8(recordOffset);
                         recordOffset++;
 
+                        console.log('Found tag:', `0x${tag.toString(16).padStart(2, '0')}`);
+
                         if (tag === 0x10 && recordOffset > currentOffset + 1) {
                             recordOffset--;
                             break;
@@ -612,6 +616,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
 
+                    console.log('Found tag:', `0x${tag.toString(16).padStart(2, '0')}`);
+
                     if (tag === 0xFE) {
                         const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
                         Object.assign(record.tags, extendedTags);
@@ -738,6 +744,11 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 }
             }
         }
+
+        console.log('Raw packet data:', buffer.toString('hex'));
+        console.log('Packet length:', actualLength);
+        console.log('Current offset:', currentOffset);
+        console.log('End offset:', endOffset);
 
         return result;
     } catch (error) {
