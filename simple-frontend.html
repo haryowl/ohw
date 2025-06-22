@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galileosky Parser - Simple Frontend</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            background: #ecf0f1;
+            padding: 15px 20px;
+            border-bottom: 1px solid #bdc3c7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #27ae60;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            min-height: 600px;
+        }
+
+        .map-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+        }
+
+        .map-container h3 {
+            padding: 15px;
+            background: #343a40;
+            color: white;
+            margin: 0;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+
+        .data-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+            overflow: hidden;
+        }
+
+        .data-container h3 {
+            padding: 15px;
+            background: #343a40;
+            color: white;
+            margin: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .data-table th {
+            background: #495057;
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .controls {
+                justify-content: center;
+            }
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Galileosky Parser</h1>
+            <p>Real-time GPS Tracking & Data Visualization</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="connectionStatus"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                <button class="btn btn-success" onclick="downloadData()">📥 Download CSV</button>
+                <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="map-container">
+                <h3>📍 Live Tracking Map</h3>
+                <div id="map"></div>
+            </div>
+
+            <div class="data-container">
+                <h3>
+                    📊 Parsed Data
+                    <span id="dataCount">(0 records)</span>
+                </h3>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    Loading data...
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Device</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                                <th>Speed</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody">
+                            <tr>
+                                <td colspan="6" class="no-data">No data available yet...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalRecords">0</div>
+                <div class="stat-label">Total Records</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="activeDevices">0</div>
+                <div class="stat-label">Active Devices</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="lastUpdate">-</div>
+                <div class="stat-label">Last Update</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgSpeed">0</div>
+                <div class="stat-label">Avg Speed (km/h)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            serverUrl: window.location.hostname === 'localhost' ? 'http://localhost:3001' : `http://${window.location.hostname}:3001`,
+            refreshInterval: 5000, // 5 seconds
+            maxRecords: 1000
+        };
+
+        // Global variables
+        let map;
+        let markers = new Map();
+        let dataRecords = [];
+        let isConnected = false;
+        let refreshTimer;
+
+        // Initialize the application
+        function init() {
+            initializeMap();
+            setupWebSocket();
+            startDataRefresh();
+            updateStatus('Connecting to server...', false);
+        }
+
+        // Initialize Leaflet map
+        function initializeMap() {
+            map = L.map('map').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Setup WebSocket connection
+        function setupWebSocket() {
+            const wsUrl = config.serverUrl.replace('http', 'ws') + '/ws';
+            
+            try {
+                const ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    updateStatus('Connected', true);
+                    isConnected = true;
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.topic === 'device_data') {
+                            handleDeviceData(data.data);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket disconnected');
+                    updateStatus('Disconnected', false);
+                    isConnected = false;
+                    // Try to reconnect after 5 seconds
+                    setTimeout(setupWebSocket, 5000);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Connection error', false);
+                };
+            } catch (error) {
+                console.error('WebSocket setup failed:', error);
+                updateStatus('WebSocket not available', false);
+            }
+        }
+
+        // Start periodic data refresh
+        function startDataRefresh() {
+            refreshTimer = setInterval(refreshData, config.refreshInterval);
+        }
+
+        // Refresh data from server
+        async function refreshData() {
+            if (!isConnected) return;
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`${config.serverUrl}/api/data/latest`);
+                if (response.ok) {
+                    const data = await response.json();
+                    handleDeviceData(data);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Handle incoming device data
+        function handleDeviceData(data) {
+            if (!data || !Array.isArray(data)) return;
+            
+            data.forEach(record => {
+                if (record.latitude && record.longitude) {
+                    addOrUpdateMarker(record);
+                }
+                addDataRecord(record);
+            });
+            
+            updateStats();
+            updateStatus('Connected', true);
+        }
+
+        // Add or update marker on map
+        function addOrUpdateMarker(record) {
+            const deviceId = record.deviceId || record.imei || 'unknown';
+            const lat = parseFloat(record.latitude);
+            const lng = parseFloat(record.longitude);
+            
+            if (isNaN(lat) || isNaN(lng)) return;
+            
+            if (markers.has(deviceId)) {
+                // Update existing marker
+                const marker = markers.get(deviceId);
+                marker.setLatLng([lat, lng]);
+                marker.bindPopup(createPopupContent(record));
+            } else {
+                // Create new marker
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '🚗',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(createPopupContent(record));
+                markers.set(deviceId, marker);
+            }
+            
+            // Fit map to show all markers
+            if (markers.size === 1) {
+                map.setView([lat, lng], 12);
+            } else {
+                const group = new L.featureGroup(Array.from(markers.values()));
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Create popup content for markers
+        function createPopupContent(record) {
+            return `
+                <div style="min-width: 200px;">
+                    <h4>Device: ${record.deviceId || record.imei || 'Unknown'}</h4>
+                    <p><strong>Time:</strong> ${new Date(record.timestamp).toLocaleString()}</p>
+                    <p><strong>Location:</strong> ${record.latitude}, ${record.longitude}</p>
+                    <p><strong>Speed:</strong> ${record.speed || 0} km/h</p>
+                    <p><strong>Status:</strong> ${record.status || 'Unknown'}</p>
+                </div>
+            `;
+        }
+
+        // Add data record to table
+        function addDataRecord(record) {
+            // Add to beginning of array
+            dataRecords.unshift(record);
+            
+            // Limit records
+            if (dataRecords.length > config.maxRecords) {
+                dataRecords = dataRecords.slice(0, config.maxRecords);
+            }
+            
+            updateDataTable();
+        }
+
+        // Update data table
+        function updateDataTable() {
+            const tbody = document.getElementById('dataTableBody');
+            const countElement = document.getElementById('dataCount');
+            
+            countElement.textContent = `(${dataRecords.length} records)`;
+            
+            if (dataRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No data available yet...</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dataRecords.map(record => `
+                <tr>
+                    <td>${new Date(record.timestamp).toLocaleString()}</td>
+                    <td>${record.deviceId || record.imei || 'Unknown'}</td>
+                    <td>${record.latitude ? parseFloat(record.latitude).toFixed(6) : '-'}</td>
+                    <td>${record.longitude ? parseFloat(record.longitude).toFixed(6) : '-'}</td>
+                    <td>${record.speed ? parseFloat(record.speed).toFixed(1) + ' km/h' : '-'}</td>
+                    <td>${record.status || 'Unknown'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalRecords').textContent = dataRecords.length;
+            
+            const uniqueDevices = new Set(dataRecords.map(r => r.deviceId || r.imei)).size;
+            document.getElementById('activeDevices').textContent = uniqueDevices;
+            
+            if (dataRecords.length > 0) {
+                const lastRecord = dataRecords[0];
+                document.getElementById('lastUpdate').textContent = 
+                    new Date(lastRecord.timestamp).toLocaleTimeString();
+                
+                const speeds = dataRecords
+                    .map(r => parseFloat(r.speed))
+                    .filter(s => !isNaN(s));
+                
+                const avgSpeed = speeds.length > 0 
+                    ? (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1)
+                    : '0';
+                document.getElementById('avgSpeed').textContent = avgSpeed;
+            }
+        }
+
+        // Update connection status
+        function updateStatus(message, connected) {
+            const statusDot = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('statusText');
+            
+            statusText.textContent = message;
+            statusDot.className = 'status-dot' + (connected ? ' connected' : '');
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            loading.className = show ? 'loading show' : 'loading';
+        }
+
+        // Download data as CSV
+        function downloadData() {
+            if (dataRecords.length === 0) {
+                alert('No data to download');
+                return;
+            }
+            
+            const headers = ['Time', 'Device ID', 'Latitude', 'Longitude', 'Speed (km/h)', 'Status'];
+            const csvContent = [
+                headers.join(','),
+                ...dataRecords.map(record => [
+                    new Date(record.timestamp).toISOString(),
+                    record.deviceId || record.imei || 'Unknown',
+                    record.latitude || '',
+                    record.longitude || '',
+                    record.speed || '',
+                    record.status || ''
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `galileosky_data_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Clear all data
+        function clearData() {
+            if (confirm('Are you sure you want to clear all data?')) {
+                dataRecords = [];
+                markers.clear();
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+                updateDataTable();
+                updateStats();
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+        });
+    </script>
+</body>
+</html> 
