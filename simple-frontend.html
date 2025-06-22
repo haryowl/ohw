@@ -497,6 +497,27 @@
             const latestPacket = data[data.length - 1];
             lastData = latestPacket;
             
+            // Debug logging
+            console.log('Frontend received data:', {
+                packetCount: data.length,
+                latestPacket: {
+                    deviceId: latestPacket.deviceId,
+                    imei: latestPacket.imei,
+                    latitude: latestPacket.latitude,
+                    longitude: latestPacket.longitude,
+                    speed: latestPacket.speed,
+                    direction: latestPacket.direction,
+                    height: latestPacket.height,
+                    satellites: latestPacket.satellites,
+                    supplyVoltage: latestPacket.supplyVoltage,
+                    batteryVoltage: latestPacket.batteryVoltage,
+                    temperature: latestPacket.temperature,
+                    status: latestPacket.status,
+                    hasTags: !!latestPacket.tags,
+                    tagCount: latestPacket.tags ? Object.keys(latestPacket.tags).length : 0
+                }
+            });
+            
             // Update statistics
             packetCount = data.length;
             devices.clear();
@@ -557,19 +578,19 @@
                     }
                 } else if (tagData.type === 'datetime') {
                     displayValue = new Date(tagData.value).toLocaleString();
-                } else if (tagData.type === 'uint16' && tagData.name.includes('Voltage')) {
+                } else if (tagData.type === 'uint16' && tagData.description.includes('Voltage')) {
                     displayValue = `${tagData.value} mV`;
-                } else if (tagData.type === 'int8' && tagData.name.includes('Temperature')) {
+                } else if (tagData.type === 'int8' && tagData.description.includes('Temperature')) {
                     displayValue = `${tagData.value}°C`;
-                } else if (tagData.type === 'int16' && tagData.name.includes('Height')) {
+                } else if (tagData.type === 'uint16' && tagData.description.includes('Height')) {
                     displayValue = `${tagData.value}m`;
                 }
 
                 return `
                     <div class="parameter-item">
-                        <div class="parameter-name">${tagData.name} (${tagHex})</div>
+                        <div class="parameter-name">${tagData.description} (${tagHex})</div>
                         <div class="parameter-value">${displayValue}</div>
-                        <div class="parameter-description">${tagData.description}</div>
+                        <div class="parameter-description">${tagData.type}</div>
                     </div>
                 `;
             }).join('');
