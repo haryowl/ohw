@@ -1,0 +1,510 @@
+Packet protocol tags
+
+
+
+  №         Tag                     Description            Length, byte                            Format
+
+
+  1         0x01       Hardware version                         1         Unsigned integer
+  2         0x02       Firmware version                         1         Unsigned integer
+  3         0x03       IMEI                                    15         ASCII string
+  4         0x04       Identifier of a device                   2         Unsigned integer
+  5         0x10       Number of an archive record              2         Unsigned integer
+  6         0x20       Date and time                            4         Unsigned integer, seconds since 1970-01-01
+                                                                          00:00:00 GMT
+  7         0x30       Coordinates in degrees,                  9         4 lower bits: number of satellites.
+                       number of satellites,                              The next 4 bits: coordinates correctness,
+                       indication of coordinates                          0 – coordinates are correct,
+                       determination correctness                          GLONASS/GPS module is a source,
+                       and source of coordinates                          2 - coordinates are correct,
+                                                                          cellular base stations are a source,
+                                                                          other values – coordinates are incorrect.
+                                                                          The next 4 bytes: signed integer,
+                                                                          latitude, the value should be divided
+                                                                          by 1000000, negative values correspond
+                                                                          to southern latitude.
+                                                                          Last 4 bytes: signed integer,
+                                                                          longitude, the value should be divided
+                                                                          by 1000000, negative values correspond
+                                                                          to western longitude.
+                                                                          For example, received:
+                                                                          07 C0 0E 32 03 B8 D7 2D 05.
+                                                                          Coordinates correctness:
+                                                                          0 (coordinates are correct).
+                                                                          Satellites number: 7
+                                                                          Latitude: 53.612224
+                                                                          Longitude: 86.890424
+  8         0x33       Speed in km/h and direction in           4         2 lower bytes: unsigned integer,
+                       degrees                                            speed, the value should be divided by 10.
+                                                                          2 higher bytes: unsigned integer,
+                                                                          direction, the value should be divided by 10.
+                                                                          For example, received: 5C 00 48 08.
+                                                                          Speed: 9.2 km/h.
+                                                                          Direction: 212 degrees.
+  9         0x34       Height, m                                2         Signed integer
+  10        0x35       One of the values:                       1         Unsigned integrer.
+                       HDOP, if GLONASS/GPS                               In case of HDOP, the value should be
+                       module is coordinates source                       divided by 10.
+                       Error in meters, if cellular base                  In case of error, the value should be multiplied
+                       stations are a source.                             by 10.
+  11        0x40       Status of device                         2         Unsigned integer, each bit corresponds
+                                                                          to a separate unit state, see explanations
+                                                                          below
+  12        0x41       Supply voltage, mV                       2         Unsigned integer
+  13        0x42       Battery voltage, mV                      2         Unsigned integer
+  14        0x43       Inside temperature, °C                   1         Signed integer
+  15        0x44       Acceleration (this tag can only          4         10 lower bits: acceleration by X axis.
+                       be used on tracking devices up to                  Next 10 bits: acceleration by Y axis.
+                       and including the 5.1 version)                     Next 10 bits: acceleration by Z axis.
+                                                                          0g = 512, values less than 512 – acceleration,
+                                                                          directed against the axis. Scale 1g=186.
+                                                                          For example, 326 = -1g, 605 = 0,5g.
+№    Tag                 Description           Length, byte                           Format
+
+
+                                                              Example, received: AF 21 98 15.
+                                                              Acceleration X: 431, Y: 520, Z: 345.
+16   0x45   Status of outputs                       2         Each bit, beginning with the lower one,
+                                                              indicates the state of a correspondent
+                                                              output
+17   0x46   Status of inputs                        2         Each bit, beginning with the lower one,
+                                                              indicates triggering on a correspondent
+                                                              input
+18   0x50   Input voltage 0                         2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV,
+            2. number of pulses;
+            3. frequency,Hz.
+19   0x51   Input voltage 1                         2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV,
+            2. number of pulses;
+            3. frequency,Hz.
+20   0x52   Input voltage 2                         2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV,
+            2. number of pulses;
+            3. frequency,Hz.
+21   0x53   Input voltage 3                         2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV,
+            2. number of pulses;
+            3. frequency,Hz.
+22   0x58   RS232 0                                 2         The format depends on the port settings
+23   0x59   RS232 1                                 2         The format depends on the port settings
+24   0x70   Thermometer 0 identifier and            2         Lower byte: unsigned integer, identifier.
+            measured temperature, °C                          Higher byte: signed integer, temperature.
+                                                              Identifier 127 with temperature -128 ºC mean
+                                                              a disconnection.
+                                                              Example, received: 01 10
+                                                              Identifier: 01
+                                                              Temperature: 16ºC
+25   0x71   Thermometer 1 identifier and            2         Analogous to temperature sensor 1
+            measured temperature, °C
+26   0x72   Thermometer 2 identifier and            2         Analogous to temperature sensor 2
+            measured temperature, °C
+27   0x73   Thermometer 3 identifier and            2         Analogous to temperature sensor 3
+            measured temperature, °C
+28   0x74   Thermometer 4 identifier and            2         Analogous to temperature sensor 4
+            measured temperature, °C
+29   0x75   Thermometer 5 identifier and            2         Analogous to temperature sensor 5
+            measured temperature, °C
+30   0x76   Thermometer 6 identifier and            2         Analogous to temperature sensor 6
+            measured temperature, °C
+31   0x77   Thermometer 7 identifier and            2         Analogous to temperature sensor 7
+            measured temperature, °C
+32   0x90   First iButton key identification        4
+            number
+33   0xc0   CAN-bus and CAN-LOG data                4         Unsigned integer, the value should be
+            (CAN_A0). Fuel used by                            divided by 2
+            a vehicle from the date of
+№    Tag                Description          Length, byte                          Format
+
+
+            manufacturing, l
+34   0xc1   CAN-bus and CAN-LOG data              4         Lower byte: fuel level, the value should be
+            (CAN_A1). Fuel level, %;                        multiplied by 0.4
+            coolant temperature, ⁰C;                        The second byte: coolant temperature,
+            Enginespeed, rpm.                               the value should be deducted 40.
+                                                            The third and fourth bytes: engine speed,
+                                                            values should be multiplied by 0.125.
+                                                            Example of data from bus in order of
+                                                            receiving: FA 72 50 25.
+                                                            Fuel level: 100%.
+                                                            Temperature 74ºC.
+                                                            Engine speed: 1194 rmp
+35   0xC2   CAN-bus and CAN-LOG data              4         Unsigned integer, the value should be
+            (CAN_B0).                                       multiplied by 5
+            Vehicle`s mileage, m.
+36   0xC3   CAN_B1                                4
+37   0xC4   CAN8BITR0                             1         If speed is transmitted from CAN-LOG,
+            or vehicle speed from                           the value is an unsigned integer
+            CAN-LOG, km/h
+38   0xC5                        rd
+            CAN8BITR1 or the 2 byte               1
+            of prefix S CAN-LOG
+39   0xC6                        st
+            CAN8BITR2 or the 1 byte               1
+            of prefix S CAN-LOG
+40   0xC7   CAN8BITR3 or lower byte               1
+            of prefix S CAN-LOG
+41   0xC8                        rd
+            CAN8BITR4 or the 3 byte               1
+            of prefix P CAN-LOG
+42   0xC9                        rd
+            CAN8BITR5 or the 2 byte               1
+            of prefix P CAN-LOG
+43   0xCA                        st
+            CAN8BITR6 or the 1 byte               1
+            of prefix P CAN-LOG
+44   0xCB   CAN8BITR7 or lower byte               1
+            of prefix P CAN-LOG
+45   0xCC   CAN8BITR8 or the first byte           1
+            in the procedure for receiving
+            of prefix WA CAN-LOG
+46   0xCD   CAN8BITR9 or the second               1
+            byte in the procedure for
+            receiving of prefix WA CAN-LOG
+47   0xCE   CAN8BITR10 or the third byte          1
+            in the procedure for receiving
+            of prefix WA CAN-LOG
+48   0xCF   CAN8BITR11 or the fourth byte         1
+            in the procedure for receiving
+            of prefix WA CAN-LOG
+49   0xD0   CAN8BITR12 or the fifth byte          1
+            in the procedure for receiving
+            of prefix WA CAN-LOG
+50   0xD1   CAN8BITR13 or the sixth byte          1
+            in the procedure for receiving
+            of prefix WA CAN-LOG
+51   0xD2   CAN8BITR14 or the seventh             1
+            byte in the procedure for
+            receiving of prefix WA CAN-LOG
+52   0xD3   The second iButton key                4
+            identification number
+№    Tag                    Description          Length, byte                           Format
+
+
+53   0xD4   Total mileage according to                4         Unsigned integer
+            GPS/GLONASS units data, m.
+54   0xD5   State of iButton keys, identifiers        1         Each bit corresponds to one key.
+            of which are set by iButton                         Example, received: 05 or 00000101
+                                                                in binary system. It means that the first and
+            command.                                            the third keys are connected
+55   0xD6   Depending on settings:                    2         In case the load is on axle, the value is
+            1. CAN16BITR0                                       an unsigned integer; values should be
+            2. the 1st vehicle’s axle                           divided by 2
+            load, kg
+            3. failure code OBD ΙΙ
+56   0xD7   Depending on settings:                    2         In case the load is on axle, the value is
+            1. CAN16BITR1                                       an unsigned integer; values should be
+                     nd
+            2. the 2 vehicle’s axle                             divided by 2
+            load, kg
+            3. failure code OBD ΙΙ
+57   0xD8   Depending on settings:                    2         In case the load is on axle, the value is
+            1. CAN16BITR2                                       an unsigned integer; values should be
+                     rd
+            2. the 3 vehicle’s axle                             divided by 2
+            load, kg
+            3. failure code OBD ΙΙ
+58   0xD9   Depending on settings:                    2         In case the load is on axle, the value is
+            1. CAN16BITR3                                       an unsigned integer; values should be
+                     th
+            2. the 4 vehicle’s axle                             divided by 2
+            load, kg
+            3. failure code OBD ΙΙ
+59   0xDA   Depending on settings:                    2         In case the load is on axle, the value is
+            1. CAN16BITR4                                       an unsigned integer; values should be
+                     th
+            2. the 5 vehicle’s axle                             divided by 2
+            load, kg
+            3. failure code OBD ΙΙ
+60   0xDB   Depending on settings:                    4         In case the time of engine operation is
+            1. CAN32BITR0                                       transmitted,
+            2. total time of engine                             the value is an unsigned integer;
+            operation, h                                        values should be divided by 100
+61   0xDC   Depending on settings:                    4         In case the fuel level is on CAN-LOG,
+            1. CAN32BITR1                                       the value is an unsigned integer; values
+            2. CAN-LOG, R prefix,                               should be divided by 10
+            fuel level, l
+62   0xDD   Depending on settings:                    4
+            1.CAN32BITR2
+            2. CAN-LOG, user prefix
+63   0xDE   Depending on settings:                    4
+            1. CAN32BITR3
+            2. CAN-LOG, user prefix
+64   0xDF   Depending on settings:                    4
+            1.CAN32BITR4
+            2. CAN-LOG, user prefix
+65   0x54   Input 4 values.                           2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV
+            2. number of pulses
+            3. frequency, Hz
+66   0x55   Input 5 values.                           2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV
+№    Tag                  Description   Length, byte                           Format
+
+
+            2. number of pulses
+            3. frequency, Hz
+67   0x56   Input 6 values.                  2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV
+            2. number of pulses
+            3. frequency, Hz
+68   0x57   Input 7 values.                  2         Unsigned integer
+            Depending on settings:
+            1. voltage, mV
+            2. number of pulses
+            3. frequency, H
+69   0x80   Zero DS1923 sensor               3         Lower byte: unsigned integer, identifier.
+            Identifier, measured                       The second byte: signed integer, temperature.
+            temperature ºC and                         Higher byte: humidity, values should be
+            humidity %                                 multiplied by 100 and divided by 255.
+                                                       Example, received: 01 10 20.
+                                                       Identifier: 01
+                                                       Temperature: 16ºC.
+                                                       Humidity: 12.54%
+70   0x81        st
+            The 1 DS1923 sensor              3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %.
+71   0x82        nd
+            The 2 DS232sensor                3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+72   0x83        rd
+            The 3 DS232 sensor               3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+73   0x84        th
+            The 4 DS232 sensor               3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+74   0x85        th
+            The 5 DS232 sensor               3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+75   0x86        th
+            The 6 DS232 sensor               3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+76   0x87        th
+            The 7 DS232 sensor               3         Analogous to DS1923 zero sensor
+            Identifier, measured
+            temperature °C and
+            humidity %
+77   0x60   RS485 [0]. Fuel level            2         Unsigned integer
+            sensor with address 0
+78   0x61   RS485 [1]. Fuel level            2         Unsigned integer
+            sensor with address 1
+79   0x62   RS485 [2]. Fuel level            2         Unsigned integer
+            sensor with address 2
+80   0x63   RS485 [3]. Fuel level            3         2 lower bytes: unsigned integer,
+            sensor with address 3.                     relative fuel level.
+                  №           Tag                      Description               Length, byte                          Format
+
+
+                                         Relative fuel level and                                Higher byte: signed integer,
+                                         temperature                                            temperature, °C
+                  81          0x64       RS485 [4]. Fuel level                        3         2 lower bytes: unsigned integer,
+                                         sensor with address 4.                                 relative fuel level.
+                                         Relative fuel level and                                Higher byte: signed integer,
+                                         temperature                                            temperature, °C
+85[14] (0x65-0x6E) are similar to RS485[4] with numbers 82-91
+                  92          0x6F       RS485 [15]. Fuel level                       3         2 lower bytes: unsigned integer,
+                                         sensor with address 15.                                relative fuel level.
+                                         Relative fuel level and temperature.                   Higher byte: signed integer,
+                                                                                                temperature, °C
+                  93          0x88       Extended data RS232[0].                      1         Signed integer
+                                         Depending on settings:
+                                         1. Temperature from fuel
+                                         level sensors connected
+                                         to RS232 0, °C
+                                         2. Weight, received from
+                                         weight identifier.
+                  94          0x89       Expanded data RS232[1].                      1         Signed integer
+                                         Depending on the settings:
+                                         1. Temperature from fuel
+                                         level sensors connected
+                                         to Rs232[1], °C
+                                         2. Weight received from
+                                         weight identifier
+                  95         0x8A        Temperature from fuel                        1         Signed integer
+                                         level sensors connected
+                                         to RS485 port with
+                                         address 0, °C
+                  96         0x8B        Temperature from fuel                        1         Signed integer
+                                         level sensors connected
+                                         to RS485 port with
+                                         address 1, °C
+                  97         0x8C        Temperature from fuel                        1         Signed integer
+                                         level sensors connected
+                                         to RS485 port with
+                                         address 2, °C
+                  98          0x78       Input 8 value.                               2         Unsigned integer
+                                         Depending on the settings, one of the
+                                         options is the following:
+                                         1. voltage, mV;
+                                         2. number of pulses;
+                                         frequency, Hz.
+                  99          0x79       Input 9 value.                               2         Unsigned integer
+                                         Depending on the settings, one of the
+                                         options is the following:
+                                         1. voltage, mV;
+                                         2. number of pulses;
+                                         frequency, Hz.
+                  100        0x7A        Input 10 value.                              2         Unsigned integer
+                                         Depending on the settings, one of the
+                                         options is the following:
+                                         1. voltage, mV;
+                                         2. number of pulses;
+                                         frequency, Hz.
+                  101        0x7B        Input 11 value.                              2         Unsigned integer
+                                         Depending on the settings, one of the
+                                         options is the following:
+                 №          Tag                      Description              Length, byte                           Format
+
+
+                                      1. voltage, mV;
+                                      2. number of pulses;
+                                      frequency, Hz.
+                102        0x7C       Input 12 value.                              2         Unsigned integer
+                                      Depending on the settings, one of the
+                                      options is the following:
+                                      1. voltage, mV;
+                                      2. number of pulses;
+                                      frequency, Hz.
+                103        0x7D       Input 13 value.                              2         Unsigned integer
+                                      Depending on the settings, one of the
+                                      options is the following:
+                                      1. voltage, mV;
+                                      2. number of pulses;
+                                      frequency, Hz.
+                104        0x21       Milliseconds                                 2         Unsigned integer, the number of milliseconds (0 to
+                                                                                             999) completes the date and time value
+                129        0xA0       CAN8BITR15 or the eighth                     1         Accessible only by a dynamic archive
+                                      byte in the procedure for                              structure
+                                      receiving of prefix WA
+                                      CAN-LOG
+BITR29 (0xA1-0xAE) similar to CAN8BITR16 with numbers 130-143
+                144        0xAF       CAN8BITR30                                   1         Accessible only by the dynamic archive structure
+                145        0xB0       CAN16BITR5                                   2         Accessible only by the dynamic archive
+                                                                                             structure
+6BITR13 (0xB1-0xB8) similar to CAN16BITR5 with numbers 146-153
+                154        0xB9       CAN16BITR14                                  2         Accessible only by the dynamic archive
+                                                                                             structure
+                161        0xF0       CAN32BITR5                                   4         Accessible only by the dynamic archive
+                                                                                             structure
+2BITR13 (0xF1-0xF8) similar to CAN32BITR5 with numbers 162-169
+                170        0xF9       CAN32BITR14                                  4         Accessible only by the dynamic archive
+                                                                                             structure
+                171        0x5A       REP-500 electricity meter                    4         Unsigned integer
+                                      readings
+                173        0x5B       Refrigeration unit data                                See the format below
+                174        0x47       EcoDrive and driving style                   4         Accessible only by the dynamic archive
+                                      determination                                          structure.
+                                                                                             Unsigned integer.
+                                                                                             Lower byte: acceleration.
+                                                                                             The second byte: braking.
+                                                                                             The third byte: cornering acceleration.
+                                                                                             The fourth byte: strike on bumps.
+                                                                                             All accelerations are expressed in standard
+                                                                                             units, 100 = 1g = 9,8 m/s2
+                175        0x5C       PressurePro tires pressure                  68         Array from 34 structures per 2 bytes.
+                                      monitoring system, 34 sensors                          Index in array corresponds to the sensor number.
+                                                                                             Data structure from sensor:
+                                                                                             Lower byte: unsigned integer, tire pressure, psi.
+                                                                                             Higher byte:
+                                                                                             Bit 0-2: temperature, from -40°С up
+                                                                                             to 100°C with the 20°C interval.
+                                                                                             Bit 3:1 – no connection with the sensor,
+                                                                                             0 –sensor is connected.
+                                                                                             Bit 4: identifier of sensor battery low charge.
+                                                                                             Bit 5-7: the reason of data sending
+                                                                                             from the sensor.
+№     Tag                  Description       Length, byte                            Format
+
+
+                                                            000 – occassional sending.
+                                                            001 – pressure decrease by 10%
+                                                            for PressurePro or by 12,5% for TPMS.
+                                                            010 – pressure decrease by 20%
+                                                            for PressurePro or by 25% for TPMS.
+                                                            100 – high temperature for TPMS.
+                                                            101 – rapid pressure decrease for TPMS.
+                                                            011 – pressure decrease by 50% for TPMS.
+                                                            110 – the tire is inflated for PressurePro
+                                                            or high pressure for TPMS.
+                                                            111 - New Magnet for PressurePro
+176   0x5D   DBG-S11Ddosimeter data               3         2 lower bytes: ADER, 3V/h,
+                                                            unsigned integer, (xxxxxxyy yyyyyyyy –
+                                                            x-order, y – floating-point coefficient).
+                                                            Higher byte: dosimeter state.
+                                                            Bit 0-2: dose power and its indeterminacy
+                                                            value:
+                                                            000 –weighted average value is typed out
+                                                            via 2 channels
+                                                            001 –channel 1 value is typed out
+                                                            010 – channel 2 value is typed out
+                                                            101 – false value is typed out (device in
+                                                            testing mode)
+                                                            Bit 3 – channel 1 state: 0 – is off, 1 – is on.
+                                                            Bit 4: channel 1 state: 0 – OK, 1 – failure.
+                                                            Bit 5: channel 2 state: 0 – is off, 1 – is on.
+                                                            Bit 6: channel 2 state: 0 - OK, 1 - failure.
+                                                            Bit 7: economy mode: 0 –is off, 1 – is on.
+177   0xE2   User data 0                          4
+177   0xE3   User data 1                          4
+177   0xE4   User data 2                          4
+177   0xE5   User data 3                          4
+177   0xE6   User data 4                          4
+177   0xE7   User data 5                          4
+177   0xE8   User data 6                          4
+184   0xE9   User data 7                          4
+185   0xEA   UserArray                                      Lower byte is array length
+186          Minimum data set
+188   0x48   Expanded status of the device        2         Bit 0 is the connection state to the primary
+                                                            server. 1 is “connected”, 0 is “not connected”.
+                                                            Bit 1 is GPRS session status. 1 is “on”,
+                                                            0 is “off”.
+                                                            Bit 2 is the sign of GSM jamming.
+                                                            1 is “GSM jamming detected”,
+                                                            0 is “no jamming detected”.
+                                                            Bit 3 is the connection state to the additional
+                                                            server. 1 is “connected”, 0 is “not connected”.
+                                                            Bit 4 is the sign of GPS/GLONASS
+                                                            jamming. 1 is “jamming detected”,
+                                                            0 is “no jamming detected”
+                                                            Bit 5 is sign of connection to cable
+                                                            USB of device USB. 1 is “connected”,
+                                                            0 is “not connected.
+                                                            Bit 6 – sign of SD car presence in device.
+                                                            1 – present, 0 – absent.
+191   0x49   Transmission channel                 1         Bits 0 to 3 - transmission channel
+№     Tag                Description               Length, byte                           Format
+
+
+                                                                  0001 GSM
+                                                                  0010 WiFi
+                                                                  0011 BLE
+                                                                  Bits 4 to 7 - transmission path
+                                                                  0001 Server
+                                                                  0010 Hub
+192   0x11   Number of the current record in the        4         Unsigned integer
+             archive
+193   0x36   PDOP (Position Dilution of                 1         Unsigned integer, the value should be divided by 10.
+             Precision). GNSS Positioning
+             Accuracy Metric
+      0xFE   Extended tags                                        Length is determined by the content
+                                                                  of the tag
+

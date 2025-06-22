@@ -1,0 +1,280 @@
+Extended tag list
+
+
+
+№             Tag      Description                          Length, byte   Format                                    Example
+
+
+     1      0x0001     Tag Modbus 0                              4         The result value must be divided by 100
+     2      0x0002     Tag Modbus 1                              4         The result value must be divided by 100
+     3      0x0003     Tag Modbus 2                              4         The result value must be divided by 100
+     4      0x0004     Tag Modbus 3                              4         The result value must be divided by 100
+     5      0x0005     Tag Modbus 4                              4         The result value must be divided by 100
+     6      0x0006     Tag Modbus 5                              4         The result value must be divided by 100
+     7      0x0007     Tag Modbus 6                              4         The result value must be divided by 100
+     8      0x0008     Tag Modbus 7                              4         The result value must be divided by 100
+     9      0x0009     Tag Modbus 8                              4         The result value must be divided by 100
+    10      0x0010     Tag Modbus 9                              4         The result value must be divided by 100
+    11      0x0011     Tag Modbus 10                             4         The result value must be divided by 100
+    12      0x0012     Tag Modbus 11                             4         The result value must be divided by 100
+    13      0x0013     Tag Modbus 12                             4         The result value must be divided by 100
+    14      0x0014     Tag Modbus 13                             4         The result value must be divided by 100
+    15      0x0015     Tag Modbus 14                             4         The result value must be divided by 100
+    16      0x0016     Tag Modbus 15                             4         The result value must be divided by 100
+    17      0x0017     Tag Modbus 16                             4         The result value must be divided by 100
+    18      0x0018     Tag Modbus 17                             4         The result value must be divided by 100
+    19      0x0019     Tag Modbus 18                             4         The result value must be divided by 100
+    20      0x0020     Tag Modbus 19                             4         The result value must be divided by 100
+    21      0x0021     Tag Modbus 20                             4         The result value must be divided by 100
+    22      0x0022     Tag Modbus 21                             4         The result value must be divided by 100
+    23      0x0023     Tag Modbus 22                             4         The result value must be divided by 100
+    24      0x0024     Tag Modbus 23                             4         The result value must be divided by 100
+    25      0x0025     Tag Modbus 24                             4         The result value must be divided by 100
+    26      0x0026     Tag Modbus 25                             4         The result value must be divided by 100
+    27      0x0027     Tag Modbus 26                             4         The result value must be divided by 100
+    28      0x0028     Tag Modbus 27                             4         The result value must be divided by 100
+    29      0x0029     Tag Modbus 28                             4         The result value must be divided by 100
+    30      0x0030     Tag Modbus 29                             4         The result value must be divided by 100
+    31      0x0031     Tag Modbus 30                             4         The result value must be divided by 100
+
+
+    21      0x0021     Tag Bluetooth 0                           4
+1-62 Bluetooth tags
+    84      0x0060     Tag Bluetooth 63                          4
+    85      0x0061     Tag Modbus 32                             4         The result value must be divided by 100
+Tags Modbus with numbers 33-62
+    128     0x0080     Tag Modbus 63                             4         The result value must be divided by 100
+    129     0x0081     Cell identifier (CID)                     2
+    130     0x0082     Local area code (LAC)                     2
+    131     0x0083     Country code (MCC)                        2
+    132     0x0084     Operator code (MNC)                       2
+    133     0x0085     RSSI                                      1
+    134     0x0086     Temperature sensor extended value         4                                                   8600 0600801A
+                       tag 0
+                                                                                                                     0600 — unsigned integer sensor ID (6),
+                                                                                                                     801A — real sign value (6784), the value must be divided by 256 (26,5)
+Extended temperature sensor tags numbered 1-6
+    141     0x008D     Temperature sensor extended value         4                                                   8D00 7F000080
+                       tag 7
+                                                                                                                     7F00 — unsigned integer sensor ID (127),
+                                                                                                                     0080 — real sign value (-32768), the value must be divided by 256 (-128)
+    142     0x008E     GPS satellite information tag             4                                                   8E00 0A051EAE
+                                                                                                                     0A – number of visible - 10 (1 byte, unsigned integer)
+                                                                                                                     05 — number of used - 5 (1 byte, unsigned integer)
+                                                                                                                     1E – SNR (signal/noise) average - 30 (1 byte, unsigned integer)
+                                                                                                                     33 – SNR max - 51 (1 byte, unsigned integer)
+    143     0x008F     GLONASS satellite information tag         4
+
+    144     0x0090     BAIDOU satellite information tag          4
+    145     0x0091     GALILEO satellite information tag         4
+    146     0x0092     Active SIM IMSI tag in hexadecimal       15                                                   9200 323530393938323037303239303531,
+                       ASCII format                                                                                  where 323530393938323037303239303531 = 250998207029051
+    147     0x0093     Currently used SIM card slot              1
+    148     0x0094     Active SIM CCID tag                      20
+    153     0x00A4     Modem WIFI Status                         1                                                   Tag value:
+                                                                                                                     0 - Wi-Fi module disabled
+                                                                                                                     1 - Turn on Wi-Fi.
+                                                                                                                     2 - Turn off Wi-Fi.
+                                                                                                                     3 - Set Wi-Fi to initial state.
+                                                                                                                     4 - Select Wi-Fi.
+                                                                                                                     5 mode - Get a list of available Wi-Fi networks. Used to scan surrounding networks.
+
+                                                                                                                     6 - Connect to a given Wi-Fi network (access point, AP) .
+                                                                                                                     7 - Start your own access point. This state enables AP mode on the terminal, allowing
+                                                                                                                     other devices to connect to it.
+                                                                                                                     8 - Starting the server on the AP. The server on the terminal is activated when it
+                                                                                                                     operates as an access point.
+                                                                                                                     9 - Server session. In this mode, clients receive connections to the terminal server
+                                                                                                                     and process data from them.
+                                                                                                                     10 - Activation of client mode (STA) when the terminal is connected to a Wi-Fi
+                                                                                                                     network (access point, AP) .
+                                                                                                                     11 - Session in client mode. In this mode, the terminal connects to the specified
+                                                                                                                     servers and exchanges data with them.
+    154     0x00A5     Current WIFI error code                   1                                                   Tag value:
+                                                                                                                     0 - No errors. Indicates no errors during Wi-Fi.
+                                                                                                                     1 - operation - TCP initialization failed. Indicates a problem initializing the TCP
+                                                                                                                     connection.
+№          Tag     Description                        Length, byte   Format                                                Example
+
+
+                                                                                                                           2 - Driver initialization error. Indicates a problem when starting or initializing the driver
+                                                                                                                           Wi-Fi.
+                                                                                                                           3 - Firmware download error. Indicates a problem when downloading or updating Wi-
+                                                                                                                           Fi firmware module.
+                                                                                                                           4 - Error setting scan region. Indicates a problem when configuring the region to find
+                                                                                                                           available networks.
+                                                                                                                           5 - Deinitialization error. Indicates a problem when shutting down or clearing Wi-Fi
+                                                                                                                           resources on the module.
+                                                                                                                           6 - M2M connection error. Indicates a problem establishing a connection between
+                                                                                                                           M2M (Machine-to-Machine) devices.
+                                                                                                                           7 - Access Point (AP) connection failure. Indicates a problem when trying to connect
+                                                                                                                           to a Wi-Fi network.
+                                                                                                                           8 - Access point startup error. Indicates a problem when trying to start the device in
+                                                                                                                           access point mode.
+                                                                                                                           9 - Error getting RSSI value (signal strength). Indicates a problem while trying to
+                                                                                                                           measure the Wi-Fi signal level.
+                                                                                                                           10 - Access point disconnect error. Indicates a problem when trying to disable access
+                                                                                                                           point mode.
+                                                                                                                           11 - Client Shutdown Error (STA). Indicates a problem when trying to disable client
+                                                                                                                           mode Wi-Fi.
+                                                                                                                           12 - WLAN break time error. Indicates a problem with the connection break time
+                                                                                                                           interval Wi-Fi.
+                                                                                                                           13 - Error getting firmware information. Indicates a problem when trying to get
+                                                                                                                           information about the current firmware version.
+                                                                                                                           14 - Error getting MAC address. Indicates a problem when trying to get the Wi-Fi
+                                                                                                                           MAC address of the module.
+    155   0x00A6   GSM modem status                        1                                                               Tag Value:
+                                                                                                                           0 - Initialized. Indicates that the system has been successfully initialized and is running
+                                                                                                                           normally.
+                                                                                                                           1 - Powered up. Indicates that the device is powered on and running.
+                                                                                                                           2 - Session restart required. Indicates that the GPRS session will be restarted.
+
+                                                                                                                           3 - Module restart required. Indicates whether the device module will be restarted.
+
+                                                                                                                           4 - Power is off. Indicates that the device is powered off.
+    156   0x00A7   Network registration status             1                                                               Tag value:
+                                                                                                                           0 - Not registered, the device does not look for an operator to register. Indicates that
+                                                                                                                           the device is not registered on the network and is not currently looking for available
+                                                                                                                           operators to connect.
+                                                                                                                           1 - Registered, home network. Indicates that the device has successfully registered
+                                                                                                                           with its home network.
+                                                                                                                           2 - Not registered, but the device is currently looking for a new operator to register.
+                                                                                                                           Indicates that the device is not registered but is actively looking for available networks
+                                                                                                                           to connect.
+                                                                                                                           3 - Registration denied. Indicates that an attempt to register with the network has
+                                                                                                                           been rejected.
+                                                                                                                           4 - Unknown (e.g. out of GERAN/UTRAN coverage). Indicates that the registration
+                                                                                                                           status is unknown, possibly due to lack of network coverage.
+                                                                                                                           5 - Registered, roaming. Indicates that the device is registered on the network but
+                                                                                                                           roaming (outside the home network).
+                                                                                                                           6 - Registered for "SMS only," home network. Indicates that the device is registered
+                                                                                                                           on its home network, but only for sending and receiving SMS.
+                                                                                                                           7 - Registered for SMS only, roaming. Indicates that the device is registered to send
+                                                                                                                           and receive SMS while roaming.
+                                                                                                                           8 - Counter of registration status types. Specifies the number of different types of
+                                                                                                                           registration statuss.
+                                                                                                                           255 - Undefined. Indicates that the registration status is uncertain or unknown.
+
+    157   0x00A8   GPRS status                             1                                                               Established GPRS Session Feature:
+                                                                                                                           1 - Session Active
+                                                                                                                           0 - Session Inactive
+    158   0x00A9   Amount of free RAM                      4         Unsigned integer. Value in bytes
+    160   0x00AB   Status of records in archive           12         Byte 0-3: total number of points (unsigned integer)   2E3F0000 3E020000 DD040000, where
+
+                                                                     Bytes 4-7: number of points sent to primary server    00003F2E is the unsigned integer total number of points (16174)
+                                                                     (unsigned integer)
+                                                                     Bytes 8-11: number of points sent to secondary server 00003E02 is the unsigned integer number of points sent to the primary server (15874)
+                                                                     (unsigned integer)
+                                                                                                                           000004DD is the unsigned integer number of points sent to the secondary server
+                                                                                                                           (1245)
+    161   0x00AC   Number of the last record in the        4         Unsigned integer
+                   archive
+    163   0x00AD   MAC address WiFi                        6         MAC address in HEX format                             0080C25E265A
+    162   0x00AE   MAC address BLE                         6         MAC address in HEX format                             80EACA004F3A
+    164   0x00AF   self-troubleshooting                   14         Data Structure:                                       1700 - System error in autoinformer operation
+                                                                     Bytes 0-7: Last Reset Date and Time (UNIX time)       100 - System error in GNSS module operation
+                                                                     Bytes 8-9: Device Reboot Reason                       0 - System error during GPRS
+                                                                     Bytes 10-13: Number of reboots due to 8-9 bytes       1200 - operation - System error in power supply circuit
+                                                                                                                           400 - System error when working with SD card or eMMC memory
+                                                                                                                           500 - Task system error I2C
+                                                                                                                           503 - Accelerometer System Error
+                                                                                                                           600 - 1-Wire
+                                                                                                                           1300 Interface System Error - System Task Error Outs
+                                                                                                                           1301 - Output State Control Errors
+                                                                                                                           1400 - System error in processing IN
+                                                                                                                           1401 input states - System error in system power control (Battery, USB, external
+                                                                                                                           voltage)
+                                                                                                                           1602 - Audio system error (autoinformer, voice communication on terminals with
+                                                                                                                           ublox 3G)
+                                                                                                                           300 - System error when writing to memory
+                                                                                                                           301 - System error when reading from memory
+                                                                                                                           1900-1908 - Processor errors
+
+
+                                                                                                                           8982DF6700000000 F701 09000000, where 0000000067DF8289 - date 03.23.2025
+                                                                                                                           03:39:53 (1742701193 sec)
+                                                                                                                           01F7 - unsigned integer reason for rebooting the device (503)
+                                                                                                                           00000009 - unsigned integer number of reboots of the device (9)
+    165   0x00B0   Total mean SNR                          1         Unsigned integer                                      If value:
+                                                                                                                           > 50 - level excellent
+                                                                                                                           from 30 to 50 - level good
+№           Tag           Description                                      Length, byte             Format                                                Example
+
+
+                                                                                                                                                          from 10 to 30 - level satisfactory
+                                                                                                                                                          < 10 - level poor
+    166    0x00B1         SD card status                                        1                   Unsigned integer                                      Tag value:
+                                                                                                                                                          0 - Initialize and power up.
+                                                                                                                                                          1 - Initialize MSD
+                                                                                                                                                          2 - mode - MSD
+                                                                                                                                                          3 - mode - Mount FS
+                                                                                                                                                          4 - Monitor terminal, memory card and file system
+                                                                                                                                                          5 - Deinitialize SD card
+    167    0x00B2         SD card errors                                        1                   Unsigned integer                                      Tag Value:
+                                                                                                                                                          0 - No Errors
+                                                                                                                                                          1 - SD Card Not Found or No External Feed
+                                                                                                                                                          2 - Failed to Mark File as Shipped
+                                                                                                                                                          3 - Failed to Get Main Data Package
+                                                                                                                                                          4 - Failed to Mark Record
+                                                                                                                                                          5 - Failed to Write
+    168    0x00B3         Collector Archive Status                              12                  Byte 0-3: Total packets (unsigned integer)            2E3F0000 3E020000 DD040000
+                                                                                                    Bytes 4-7: Number of packets sent to primary server   where
+                                                                                                    (unsigned integer)
+                                                                                                    Bytes 8-11: Reserve                                   00003F2E is the unsigned integer total number of packets (16174)
+                                                                                                                                                          00003E02 is the unsigned integer number of packets sent to the primary server
+                                                                                                                                                          (15874)
+    169    0x00B4         Client MAC address 1                                  6                   MAC address in HEX format                             0080C25E4F3A
+    170    0x00B5         Client MAC address 2                                  6                   MAC address in HEX format
+    171    0x00B6         Client MAC address 3                                  6                   MAC address in HEX format
+    217    0x00D9         TMPS wheel tag 0                                      3                                                                         Structure of the data from the sensor:
+
+
+                                                                                                                                                          Byte 0: unsigned integer, tyre pressure, psi
+
+
+                                                                                                                                                          Byte 1: signed integer, temperature, °C
+
+
+                                                                                                                                                          Byte 2:
+
+
+                                                                                                                                                          Bit 0: 1 - no communication with sensor. 0 - sensor is communicating
+
+
+                                                                                                                                                          Bit 1: sign of low sensor battery or sensor error
+
+
+                                                                                                                                                          Bit 2-4: the reason for sending data from the sensor
+
+
+                                                                                                                                                          000 - periodic sending.
+                                                                                                                                                          001 - 10% pressure loss for PressurePro or 12.5% TPMS.
+                                                                                                                                                          010 - 20% pressure loss for PressurePro or 25% pressure loss for TPMS.
+                                                                                                                                                          100 - high temperature for TPMS.
+                                                                                                                                                          101 - rapid pressure drop for TPMS.
+                                                                                                                                                          011 - 50% loss of pressure for TPMS.
+                                                                                                                                                          110 - tyre re-inflated for PressurePro or high pressure for TPMS.
+                                                                                                                                                          111 - New Magnet for PressurePro
+ TMPS wheel tags 217 to 250
+    250    0x00FA         TMPS wheel tag 33                                     3
+    252    0x00FC         Reason for recording an archive point                 1                                                                         Tag values:
+
+                                                                                                                                                          1 - Periodic recording by device settings
+                                                                                                                                                          2 - iButton key events
+                                                                                                                                                          3 - Data from DataCOLD500 received
+                                                                                                                                                          4 - Data from EuroScan received
+                                                                                                                                                          5 - Data from ThermoKing received
+                                                                                                                                                          8 - Device status changed
+                                                                                                                                                          9 - User record from pawn algorithm or script
+                                                                                                                                                          10 - Inputs event
+                                                                                                                                                          11 - Distance specified by the user in the settings was covered
+                                                                                                                                                          12 - Alarm by signalling settings was triggered
+                                                                                                                                                          13 - Emergency signal
+    253    0x00FD         iButton64 tag                                         8
+    254    0x00FE         iButton64 2 tag                                       8
+10020      0x2724         Engine Coolant Pressure 1 (Extended     size depends on the tag content
+                          Range), kPa
+SPN tags 10021 to 32768
+32769      0x8001         Brake Wear Life Remaining, Trailer      size depends on the tag content
+                          Axle #8, Left Wheel, %
+

@@ -1,0 +1,65 @@
+galileosky-parser
+├── backend
+│   ├── config
+│   │   ├── database.js
+│   │   ├── development.js
+│   │   ├── index.js
+│   │   └── production.js
+│   ├── package.json
+│   └── src
+│       ├── app.js
+│       ├── components
+│       ├── config.js
+│       ├── models
+│       │   ├── device.js
+│       │   ├── index.js
+│       │   └── mapping.js
+│       ├── routes
+│       │   ├── api.js
+│       │   └── socket.js
+│       ├── server.js
+│       ├── services
+│       │   ├── alertManager.js
+│       │   ├── dataAggregator.js
+│       │   ├── deviceManager.js
+│       │   ├── deviceMapper.js
+│       │   ├── packetProcessor.js
+│       │   ├── parser.js
+│       │   ├── specialParsers.js
+│       │   ├── tagDefinitions.js
+│       │   └── websocketHandler.js
+│       └── utils
+│           └── logger.js
+├── frontend
+│   ├── package.json
+│   └── src
+│       ├── App.js
+│       ├── components
+│       │   ├── DataChart.js
+│       │   ├── DataView.js
+│       │   ├── DeviceList.js
+│       │   ├── ErrorBoundary.js
+│       │   ├── ExportDialog.js
+│       │   ├── FieldMapper.js
+│       │   ├── Layout.js
+│       │   ├── LoadingState.js
+│       │   └── ProtectedRoute.js
+│       ├── contexts
+│       │   └── AuthContext.js
+│       ├── hooks
+│       │   └── useWebSocket.js
+│       ├── pages
+│       │   ├── Alerts.js
+│       │   ├── Dashboard.js
+│       │   ├── DeviceDetail.js
+│       │   ├── Login.js
+│       │   ├── Mapping.js
+│       │   └── Settings.js
+│       └── services
+│           ├── api.js
+│           └── exportService.js
+├── galileosky-parser.txt
+├── install-service.js
+├── package.json
+├── README.md
+└── uninstall-service.js

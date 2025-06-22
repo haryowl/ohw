@@ -1,0 +1,365 @@
+RAW	0140031060412099A14E68210E00300ED070A0FF4ED05E063300000000343000350640080A41265E423E0F450F0046030050025E51565E520000530000540000550000D4D9550000E200000000E300000000E400000000E500000000E600000000E700000000E800000000E900000000FE60000100203C03000200000000000300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000000B00000000000C00000000000D00000000000E00000000000F0000000000100000000000105F41207BA14E68211000300DD070A0FF4ED05E063300000000343000350740080A412C5E423E0F450F0046030050135E517D5E520000530000540000550000D4D9550000E200000000E300000000E400000000E500000000E600000000E700000000E800000000E900000000FE60000100E81002000200000000000300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000000B00000000000C00000000000D00000000000E00000000000F0000000000100000000000105E41205DA14E68211400300DD070A0FF4ED05E063300000000343000350740080A413A5E423A0F450F00460300501D5E51885E520000530000540000550000D4D9550000E200000000E300000000E400000000E500000000E600000000E700000000E800000000E900000000FE60000100783E03000200000000000300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000000B00000000000C00000000000D00000000000E00000000000F0000000000100000000000105D41203FA14E68211500300ED070A0FF4ED05E063300000000343000350740080A41235E423A0F450F0046030050F05D515B5E520000530000540000550000D4D9550000E200000000E300000000E400000000E500000000E600000000E700000000E800000000E900000000FE60000100143E03000200000000000300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000000B00000000000C00000000000D00000000000E00000000000F0000000000100000000000D092				
+					
+					
+					
+					byte length
+Header	01	Header			2
+Packet Length	4003	Packet Length			
+Tag	10	Number of an archive record		Unsigned integer	2
+Tag Value	6041	Little Endia 4160	16736		
+Tag	20	Date and time		Unsigned integer, seconds since 1970-01-01 00:00:00 GMT	4
+Tag Value	99A14E68	Little Endia 684EA199	1749983641 (UNIX TIME)	15/06/2025 10:34:01	
+Tag	21	Milliseconds		Unsigned integer, the number of milliseconds (0 to 999) completes the date and time value	2
+Tag Value	0E00	Little Endia 000E			
+Tag	30	Coordinates in degrees, number of satellites, indication of coordinates, determination correctness, and source of coordinates		4 lower bits: number of satellites.The next 4 bits: coordinates correctness,0 – coordinates are correct, GLONASS/GPS module is a source,cellular base stations are a source,other values – coordinates are incorrect.The next 4 bytes: signed integer,latitude, the value should be divided by 1000000, negative values correspond to western longitude. The next 4 bytes: signed integer,longitude, the value should be dividedby 1000000, negative values correspond to western longitude.For example, received:07 C0 0E 32 03 B8 D7 2D 05.Coordinates correctness:0 (coordinates are correct).Satellites number: 7 Latitude: 53.612224 Longitude: 86.890424	9
+Tag Value	0ED070A0FF4ED05E06	Little Endia 065ED04EFFA070D00E	065ED04EFFA070D00E	Number of Satelites : 14, Coordinate correctness : 0 ( correct ), Latitude : -6.262576 , Longitude : 106.877006	
+Tag	33	Speed in km/h and direction in		2 lower bytes: unsigned integer, speed, the value should be divided by 10. 2 higher bytes: unsigned integer, direction, the value should be divided by 10. For example, received: 5C 00 48 08. Speed: 9.2 km/h. Direction: 212 degrees.	4
+Tag Value	00000000	Little Endia 00000000		value 0	
+Tag	34	Height, m		Signed integer	2
+Tag Value	3000	Little Endia 0030	48	value:  48	
+Tag	35	One of the values: HDOP, if GLONASS/GPS module is coordinates source Error in meters, if cellular base stations are a source.		Unsigned integrer. In case of HDOP, the value should be divided by 10. In case of error, the value should be multiplied by 10.	1
+Tag Value	06	Little Endia 06	6	value:  6	
+Tag	40	Status of device		Unsigned integer, each bit corresponds to a separate unit state, see explanations	2
+Tag Value	080A	Little Endia 0A08			
+Tag	41	Supply voltage, mV		Unsigned integer	2
+Tag Value	265E	Little Endia 5E26	24102	value:  24102	
+Tag	42	Battery voltage, mV		Unsigned integer	2
+Tag Value	3E0F	Little Endia 0F3E	3902	value:  3902	
+Tag	45	Status of outputs		Each bit, beginning with the lower one, indicates the state of a correspondent, output	2
+Tag Value	0F00	Little Endia 000F	0000000000001111	Out0 : 1, Out1 :1, Out2:1, Out3:1	
+Tag	46	Status of inputs		Each bit, beginning with the lower one, indicates triggering on a correspondent input	2
+Tag Value	0300	Little Endia 0003	0000000000000011	Input0 : 1, Input1 : 1, Input2 : 0, Input3 : 0, Input4 : 0, Input5 : 0, Input6 : 0	
+Tag	50	Input voltage 0		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	025E	Little Endia 5E02	24066	value:  24066	
+Tag	51	Input voltage 1		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	565E	Little Endia 5E56	24150	value:  24150	
+Tag	52	Input voltage 2		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	53	Input voltage 3		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	54	Input 4 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	55	Input 5 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	D4	Total mileage according to GPS/GLONASS units data, m.		Unsigned integer	4
+Tag Value	D9550000	Little Endia 000055D9	21977	value:  21977	
+Tag	E2	User data 0			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E3	User data 1			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E4	User data 2			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E5	User data 3			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E6	User data 4			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E7	User data 5			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E8	User data 6			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E9	User data 7			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	FE	Extended tags		Length is determined by the content of the tag	1
+Tag Value	60	1	1	Unsigned integer	
+Tag	0001	Tag Modbus 0		The result value must be divided by 100	4
+Tag Value	00203C03	Little Endia 033C2000	54272000	value:  542720	
+Tag	0002	Tag Modbus 1		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0003	Tag Modbus 2		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0004	Tag Modbus 3		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0005	Tag Modbus 4		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0006	Tag Modbus 5		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0007	Tag Modbus 6		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0008	Tag Modbus 7		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0009	Tag Modbus 8		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000A	Tag Modbus 10		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000B	Tag Modbus 11		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000C	Tag Modbus 12		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000D	Tag Modbus 13		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000E	Tag Modbus 14		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000F	Tag Modbus 15		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0010	Tag Modbus 9		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+	00				
+Tag	10	Number of an archive record		Unsigned integer	2
+Tag Value	5F41	Little Endia 415F	16735		
+Tag	20	Date and time		Unsigned integer, seconds since 1970-01-01 00:00:00 GMT	4
+Tag Value	7BA14E68	Little Endia 684EA17B	1749983611 (UNIX TIME)	15/06/2025 10:33:31	
+Tag	21	Milliseconds		Unsigned integer, the number of milliseconds (0 to 999) completes the date and time value	2
+Tag Value	1000	Little Endia 0010			
+Tag	30	Coordinates in degrees, number of satellites, indication of coordinates, determination correctness, and source of coordinates		4 lower bits: number of satellites.The next 4 bits: coordinates correctness,0 – coordinates are correct, GLONASS/GPS module is a source,cellular base stations are a source,other values – coordinates are incorrect.The next 4 bytes: signed integer,latitude, the value should be divided by 1000000, negative values correspond to western longitude. The next 4 bytes: signed integer,longitude, the value should be dividedby 1000000, negative values correspond to western longitude.For example, received:07 C0 0E 32 03 B8 D7 2D 05.Coordinates correctness:0 (coordinates are correct).Satellites number: 7 Latitude: 53.612224 Longitude: 86.890424	9
+Tag Value	0DD070A0FF4ED05E06	Little Endia 065ED04EFFA070D00D	065ED04EFFA070D00D	Number of Satelites : 13, Coordinate correctness : 0 ( correct ), Latitude : -6.262576 , Longitude : 106.877006	
+Tag	33	Speed in km/h and direction in		2 lower bytes: unsigned integer, speed, the value should be divided by 10. 2 higher bytes: unsigned integer, direction, the value should be divided by 10. For example, received: 5C 00 48 08. Speed: 9.2 km/h. Direction: 212 degrees.	4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	34	Height, m		Signed integer	2
+Tag Value	3000	Little Endia 0030	48	value:  48	
+Tag	35	One of the values: HDOP, if GLONASS/GPS module is coordinates source Error in meters, if cellular base stations are a source.		Unsigned integrer. In case of HDOP, the value should be divided by 10. In case of error, the value should be multiplied by 10.	1
+Tag Value	07	Little Endia 07	7	value:  7	
+Tag	40	Status of device		Unsigned integer, each bit corresponds to a separate unit state, see explanations	2
+Tag Value	080A	Little Endia 0A08			
+Tag	41	Supply voltage, mV		Unsigned integer	2
+Tag Value	2C5E	Little Endia 5E2C	24108	value:  24108	
+Tag	42	Battery voltage, mV		Unsigned integer	2
+Tag Value	3E0F	Little Endia 0F3E	3902	value:  3902	
+Tag	45	Status of outputs		Each bit, beginning with the lower one, indicates the state of a correspondent, output	2
+Tag Value	0F00	Little Endia 000F	0000000000001111	Out0 : 1, Out1 :1, Out2:1, Out3:1	
+Tag	46	Status of inputs		Each bit, beginning with the lower one, indicates triggering on a correspondent input	2
+Tag Value	0300	Little Endia 0003	0000000000000011	Input0 : 1, Input1 : 1, Input2 : 0, Input3 : 0, Input4 : 0, Input5 : 0, Input6 : 0	
+Tag	50	Input voltage 0		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	135E	Little Endia 5E13	24083	value:  24083	
+Tag	51	Input voltage 1		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	7D5E	Little Endia 5E7D	24189	value:  24189	
+Tag	52	Input voltage 2		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	53	Input voltage 3		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	54	Input 4 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	55	Input 5 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	D4	Total mileage according to GPS/GLONASS units data, m.		Unsigned integer	4
+Tag Value	D9550000	Little Endia 000055D9	21977	value:  21977	
+Tag	E2	User data 0			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E3	User data 1			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E4	User data 2			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E5	User data 3			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E6	User data 4			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E7	User data 5			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E8	User data 6			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E9	User data 7			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	FE	Extended tags		Length is determined by the content of the tag	1
+Tag Value	60	1	1	Unsigned integer	
+Tag	0001	Tag Modbus 0		The result value must be divided by 100	4
+Tag Value	00E81002	Little Endia 0210E800	34662400	value:  346624	
+Tag	0002	Tag Modbus 1		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0003	Tag Modbus 2		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0004	Tag Modbus 3		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0005	Tag Modbus 4		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0006	Tag Modbus 5		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0007	Tag Modbus 6		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0008	Tag Modbus 7		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0009	Tag Modbus 8		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000A	Tag Modbus 10		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000B	Tag Modbus 11		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000C	Tag Modbus 12		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000D	Tag Modbus 13		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000E	Tag Modbus 14		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000F	Tag Modbus 15		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0010	Tag Modbus 9		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+	00	#N/A			
+Tag	10	Number of an archive record		Unsigned integer	2
+Tag Value	5E41	Little Endia 415E	16734		
+Tag	20	Date and time		Unsigned integer, seconds since 1970-01-01 00:00:00 GMT	4
+Tag Value	5DA14E68	Little Endia 684EA15D	1749983581 (UNIX TIME)	15/06/2025 10:33:01	
+Tag	21	Milliseconds		Unsigned integer, the number of milliseconds (0 to 999) completes the date and time value	2
+Tag Value	1400	Little Endia 0014			
+Tag	30	Coordinates in degrees, number of satellites, indication of coordinates, determination correctness, and source of coordinates		4 lower bits: number of satellites.The next 4 bits: coordinates correctness,0 – coordinates are correct, GLONASS/GPS module is a source,cellular base stations are a source,other values – coordinates are incorrect.The next 4 bytes: signed integer,latitude, the value should be divided by 1000000, negative values correspond to western longitude. The next 4 bytes: signed integer,longitude, the value should be dividedby 1000000, negative values correspond to western longitude.For example, received:07 C0 0E 32 03 B8 D7 2D 05.Coordinates correctness:0 (coordinates are correct).Satellites number: 7 Latitude: 53.612224 Longitude: 86.890424	9
+Tag Value	0DD070A0FF4ED05E06	Little Endia 065ED04EFFA070D00D	065ED04EFFA070D00D	Number of Satelites : 13, Coordinate correctness : 0 ( correct ), Latitude : -6.262576 , Longitude : 106.877006	
+Tag	33	Speed in km/h and direction in		2 lower bytes: unsigned integer, speed, the value should be divided by 10. 2 higher bytes: unsigned integer, direction, the value should be divided by 10. For example, received: 5C 00 48 08. Speed: 9.2 km/h. Direction: 212 degrees.	4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	34	Height, m		Signed integer	2
+Tag Value	3000	Little Endia 0030	48	value:  48	
+Tag	35	One of the values: HDOP, if GLONASS/GPS module is coordinates source Error in meters, if cellular base stations are a source.		Unsigned integrer. In case of HDOP, the value should be divided by 10. In case of error, the value should be multiplied by 10.	1
+Tag Value	07	Little Endia 07	7	value:  7	
+Tag	40	Status of device		Unsigned integer, each bit corresponds to a separate unit state, see explanations	2
+Tag Value	080A	Little Endia 0A08			
+Tag	41	Supply voltage, mV		Unsigned integer	2
+Tag Value	3A5E	Little Endia 5E3A	24122	value:  24122	
+Tag	42	Battery voltage, mV		Unsigned integer	2
+Tag Value	3A0F	Little Endia 0F3A	3898	value:  3898	
+Tag	45	Status of outputs		Each bit, beginning with the lower one, indicates the state of a correspondent, output	2
+Tag Value	0F00	Little Endia 000F	0000000000001111	Out0 : 1, Out1 :1, Out2:1, Out3:1	
+Tag	46	Status of inputs		Each bit, beginning with the lower one, indicates triggering on a correspondent input	2
+Tag Value	0300	Little Endia 0003	0000000000000011	Input0 : 1, Input1 : 1, Input2 : 0, Input3 : 0, Input4 : 0, Input5 : 0, Input6 : 0	
+Tag	50	Input voltage 0		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	1D5E	Little Endia 5E1D	24093	value:  24093	
+Tag	51	Input voltage 1		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	885E	Little Endia 5E88	24200	value:  24200	
+Tag	52	Input voltage 2		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	53	Input voltage 3		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	54	Input 4 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	55	Input 5 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	D4	Total mileage according to GPS/GLONASS units data, m.		Unsigned integer	4
+Tag Value	D9550000	Little Endia 000055D9	21977	value:  21977	
+Tag	E2	User data 0			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E3	User data 1			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E4	User data 2			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E5	User data 3			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E6	User data 4			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E7	User data 5			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E8	User data 6			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E9	User data 7			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	FE	Extended tags		Length is determined by the content of the tag	1
+Tag Value	60	1	1	Unsigned integer	
+Tag	0001	Tag Modbus 0		The result value must be divided by 100	4
+Tag Value	00783E03	Little Endia 033E7800	54425600	value:  544256	
+Tag	0002	Tag Modbus 1		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0003	Tag Modbus 2		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0004	Tag Modbus 3		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0005	Tag Modbus 4		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0006	Tag Modbus 5		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0007	Tag Modbus 6		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0008	Tag Modbus 7		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0009	Tag Modbus 8		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000A	Tag Modbus 10		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000B	Tag Modbus 11		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000C	Tag Modbus 12		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000D	Tag Modbus 13		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000E	Tag Modbus 14		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000F	Tag Modbus 15		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0010	Tag Modbus 9		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+	00	#N/A			
+Tag	10	Number of an archive record		Unsigned integer	2
+Tag Value	5D41	Little Endia 415D	16733		
+Tag	20	Date and time		Unsigned integer, seconds since 1970-01-01 00:00:00 GMT	4
+Tag Value	3FA14E68	Little Endia 684EA13F	1749983551 (UNIX TIME)	15/06/2025 10:32:31	
+Tag	21	Milliseconds		Unsigned integer, the number of milliseconds (0 to 999) completes the date and time value	2
+Tag Value	1500	Little Endia 0015			
+Tag	30	Coordinates in degrees, number of satellites, indication of coordinates, determination correctness, and source of coordinates		4 lower bits: number of satellites.The next 4 bits: coordinates correctness,0 – coordinates are correct, GLONASS/GPS module is a source,cellular base stations are a source,other values – coordinates are incorrect.The next 4 bytes: signed integer,latitude, the value should be divided by 1000000, negative values correspond to western longitude. The next 4 bytes: signed integer,longitude, the value should be dividedby 1000000, negative values correspond to western longitude.For example, received:07 C0 0E 32 03 B8 D7 2D 05.Coordinates correctness:0 (coordinates are correct).Satellites number: 7 Latitude: 53.612224 Longitude: 86.890424	9
+Tag Value	0ED070A0FF4ED05E06	Little Endia 065ED04EFFA070D00E	065ED04EFFA070D00E	Number of Satelites : 14, Coordinate correctness : 0 ( correct ), Latitude : -6.262576 , Longitude : 106.877006	
+Tag	33	Speed in km/h and direction in		2 lower bytes: unsigned integer, speed, the value should be divided by 10. 2 higher bytes: unsigned integer, direction, the value should be divided by 10. For example, received: 5C 00 48 08. Speed: 9.2 km/h. Direction: 212 degrees.	4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	34	Height, m		Signed integer	2
+Tag Value	3000	Little Endia 0030	48	value:  48	
+Tag	35	One of the values: HDOP, if GLONASS/GPS module is coordinates source Error in meters, if cellular base stations are a source.		Unsigned integrer. In case of HDOP, the value should be divided by 10. In case of error, the value should be multiplied by 10.	1
+Tag Value	07	Little Endia 07	7	value:  7	
+Tag	40	Status of device		Unsigned integer, each bit corresponds to a separate unit state, see explanations	2
+Tag Value	080A	Little Endia 0A08			
+Tag	41	Supply voltage, mV		Unsigned integer	2
+Tag Value	235E	Little Endia 5E23	24099	value:  24099	
+Tag	42	Battery voltage, mV		Unsigned integer	2
+Tag Value	3A0F	Little Endia 0F3A	3898	value:  3898	
+Tag	45	Status of outputs		Each bit, beginning with the lower one, indicates the state of a correspondent, output	2
+Tag Value	0F00	Little Endia 000F	0000000000001111	Out0 : 1, Out1 :1, Out2:1, Out3:1	
+Tag	46	Status of inputs		Each bit, beginning with the lower one, indicates triggering on a correspondent input	2
+Tag Value	0300	Little Endia 0003	0000000000000011	Input0 : 1, Input1 : 1, Input2 : 0, Input3 : 0, Input4 : 0, Input5 : 0, Input6 : 0	
+Tag	50	Input voltage 0		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	F05D	Little Endia 5DF0	24048	value:  24048	
+Tag	51	Input voltage 1		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	5B5E	Little Endia 5E5B	24155	value:  24155	
+Tag	52	Input voltage 2		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	53	Input voltage 3		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	54	Input 4 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	55	Input 5 values.		Unsigned integer. Depending on settings:1. voltage, mV, 2. number of pulses; 3. frequency,Hz.	2
+Tag Value	0000	Little Endia 0000	0	value:  0	
+Tag	D4	Total mileage according to GPS/GLONASS units data, m.		Unsigned integer	4
+Tag Value	D9550000	Little Endia 000055D9	21977	value:  21977	
+Tag	E2	User data 0			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E3	User data 1			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E4	User data 2			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E5	User data 3			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E6	User data 4			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E7	User data 5			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E8	User data 6			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	E9	User data 7			4
+Tag Value	00000000	Little Endia 00000000	0	value:  0	
+Tag	FE	Extended tags		Length is determined by the content of the tag	1
+Tag Value	60	1	1	Unsigned integer	
+Tag	0001	Tag Modbus 0		The result value must be divided by 100	4
+Tag Value	00143E03	Little Endia 033E1400	54400000	value:  544000	
+Tag	0002	Tag Modbus 1		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0003	Tag Modbus 2		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0004	Tag Modbus 3		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0005	Tag Modbus 4		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0006	Tag Modbus 5		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0007	Tag Modbus 6		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0008	Tag Modbus 7		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0009	Tag Modbus 8		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000A	Tag Modbus 10		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000B	Tag Modbus 11		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000C	Tag Modbus 12		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000D	Tag Modbus 13		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000E	Tag Modbus 14		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	000F	Tag Modbus 15		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+Tag	0010	Tag Modbus 9		The result value must be divided by 100	4
+Tag Value	00000000	Little Endia 00000000	0		
+	00				
+	D0	CHECKSUM			
+	92				

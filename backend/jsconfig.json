@@ -1,0 +1,11 @@
+// backend/jsconfig.json
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"],
+            "@config/*": ["src/config/*"]
+        }
+    },
+    "exclude": ["node_modules", "dist"]
+}
