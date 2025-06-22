@@ -13,7 +13,8 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir);
 }
 
-// In-memory storage for parsed data
+// Global variables for IMEI persistence
+let lastIMEI = null;
 let parsedData = [];
 let devices = new Map();
 
@@ -161,7 +162,6 @@ app.use(express.static(path.join(__dirname, 'frontend', 'build')));
 
 // Store latest data
 let latestData = null;
-let lastIMEI = null;
 
 // Calculate CRC16
 function calculateCRC16(buffer) {
@@ -826,8 +826,8 @@ function addParsedData(data) {
         // Extract common fields from tags
         const extractedData = {
             timestamp: new Date().toISOString(),
-            deviceId: 'unknown',
-            imei: null,
+            deviceId: lastIMEI || 'unknown', // Use persisted IMEI
+            imei: lastIMEI || null,
             latitude: null,
             longitude: null,
             satellites: null,
@@ -848,10 +848,12 @@ function addParsedData(data) {
             tags: tags
         };
         
-        // Extract IMEI (tag 0x03)
+        // Extract IMEI (tag 0x03) and persist it
         if (tags['0x03']) {
             extractedData.imei = tags['0x03'].value;
             extractedData.deviceId = tags['0x03'].value;
+            lastIMEI = tags['0x03'].value; // Persist IMEI for future packets
+            console.log('IMEI extracted and persisted:', lastIMEI);
         }
         
         // Extract coordinates (tag 0x20)
@@ -862,6 +864,7 @@ function addParsedData(data) {
                 extractedData.longitude = coords.longitude;
                 extractedData.satellites = coords.satellites;
                 extractedData.correctness = coords.correctness;
+                console.log('Coordinates extracted:', { lat: coords.latitude, lon: coords.longitude });
             }
         }
         
@@ -871,57 +874,68 @@ function addParsedData(data) {
             if (speedDir && typeof speedDir === 'object') {
                 extractedData.speed = speedDir.speed;
                 extractedData.direction = speedDir.direction;
+                console.log('Speed/Direction extracted:', { speed: speedDir.speed, direction: speedDir.direction });
             }
         }
         
         // Extract altitude (tag 0x22)
         if (tags['0x22']) {
             extractedData.altitude = tags['0x22'].value;
+            console.log('Altitude extracted:', tags['0x22'].value);
         }
         
         // Extract course (tag 0x23)
         if (tags['0x23']) {
             extractedData.course = tags['0x23'].value;
+            console.log('Course extracted:', tags['0x23'].value);
         }
         
         // Extract HDOP (tag 0x24)
         if (tags['0x24']) {
             extractedData.hdop = tags['0x24'].value;
+            console.log('HDOP extracted:', tags['0x24'].value);
         }
         
         // Extract VDOP (tag 0x25)
         if (tags['0x25']) {
             extractedData.vdop = tags['0x25'].value;
+            console.log('VDOP extracted:', tags['0x25'].value);
         }
         
         // Extract PDOP (tag 0x26)
         if (tags['0x26']) {
             extractedData.pdop = tags['0x26'].value;
+            console.log('PDOP extracted:', tags['0x26'].value);
         }
         
         // Extract temperature (tag 0x30)
         if (tags['0x30']) {
             extractedData.temperature = tags['0x30'].value;
+            console.log('Temperature extracted:', tags['0x30'].value);
         }
         
         // Extract voltage (tag 0x31)
         if (tags['0x31']) {
             extractedData.voltage = tags['0x31'].value;
+            console.log('Voltage extracted:', tags['0x31'].value);
         }
         
         // Extract inputs (tag 0x40)
         if (tags['0x40']) {
             extractedData.inputs = tags['0x40'].value;
+            console.log('Inputs extracted:', tags['0x40'].value);
         }
         
         // Extract outputs (tag 0x41)
         if (tags['0x41']) {
             extractedData.outputs = tags['0x41'].value;
+            console.log('Outputs extracted:', tags['0x41'].value);
         }
         
         // Extract status (tag 0x50)
         if (tags['0x50']) {
             extractedData.status = tags['0x50'].value;
+            console.log('Status extracted:', tags['0x50'].value);
         }
         
         // Add to data array
@@ -944,14 +958,24 @@ function addParsedData(data) {
             });
         }
         
+        console.log('Final extracted data:', {
+            deviceId: extractedData.deviceId,
+            imei: extractedData.imei,
+            latitude: extractedData.latitude,
+            longitude: extractedData.longitude,
+            speed: extractedData.speed,
+            temperature: extractedData.temperature,
+            voltage: extractedData.voltage
+        });
+        
         logger.info(`Added data for device: ${extractedData.deviceId || 'unknown'}`);
         
     } else {
         // Handle other packet types (ignorable, extension, etc.)
         const simpleData = {
             timestamp: new Date().toISOString(),
-            deviceId: data.deviceId || 'unknown',
-            imei: data.imei,
+            deviceId: lastIMEI || data.deviceId || 'unknown',
+            imei: lastIMEI || data.imei,
             type: data.header ? `0x${data.header.toString(16).padStart(2, '0')}` : 'unknown',
             rawData: data
         };
@@ -1198,6 +1222,18 @@ function handleAPIRequest(req, res) {
         if (pathname === '/api/data/latest') {
             const limit = parseInt(parsedUrl.query.limit) || 100;
             const data = getLatestData(limit);
+            console.log('API /api/data/latest called, returning data:', {
+                count: data.length,
+                firstRecord: data[0] ? {
+                    deviceId: data[0].deviceId,
+                    imei: data[0].imei,
+                    latitude: data[0].latitude,
+                    longitude: data[0].longitude,
+                    speed: data[0].speed,
+                    temperature: data[0].temperature,
+                    voltage: data[0].voltage
+                } : null
+            });
             res.writeHead(200);
             res.end(JSON.stringify(data));
         } else if (pathname === '/api/stats') {
