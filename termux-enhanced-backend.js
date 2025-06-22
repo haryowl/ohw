@@ -130,7 +130,7 @@ function validatePacket(buffer) {
     };
 }
 
-// Parse packet data and extract useful information using proper tag parsing
+// Parse packet data and extract useful information using proper Galileosky protocol
 function parsePacketData(buffer) {
     const packetInfo = validatePacket(buffer);
     
@@ -147,45 +147,48 @@ function parsePacketData(buffer) {
         timestamp: new Date().toISOString(),
         rawData: data.toString('hex').toUpperCase(),
         tags: {},
-        parameters: {}
+        parameters: {},
+        records: []
     };
     
-    // Parse all tags in the packet
-    let offset = 0;
-    while (offset < data.length) {
-        const tag = data.readUInt8(offset);
-        
-        // Stop if we encounter a null byte (separator)
-        if (tag === 0) {
-            break;
+    // Parse based on packet type and size according to Galileosky protocol
+    if (packetInfo.header === 0x01) {
+        // Main Packet (0x01) - Parse based on size
+        if (packetInfo.actualLength < 32) {
+            // Single record main packet (< 32 bytes)
+            parsedInfo.packetType = 'Single Record Main Packet';
+            parsedInfo.records = [parseSingleRecord(data, 0)];
+        } else {
+            // Multiple records main packet (>= 32 bytes)
+            parsedInfo.packetType = 'Multiple Records Main Packet';
+            parsedInfo.records = parseMultipleRecords(data);
         }
+    } else if (packetInfo.header === 0x15) {
+        // Ignorable packet - just needs confirmation
+        parsedInfo.packetType = 'Ignorable Packet';
+        parsedInfo.records = [parseIgnorablePacket(data)];
+    } else {
+        // Extension packet
+        parsedInfo.packetType = 'Extension Packet';
+        parsedInfo.records = [parseExtensionPacket(data)];
+    }
+    
+    // Extract common parameters from the first record
+    if (parsedInfo.records.length > 0) {
+        const firstRecord = parsedInfo.records[0];
+        Object.assign(parsedInfo, firstRecord);
         
-        try {
-            const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-            const tagDef = getTagDefinition(tagHex);
-            
-            if (tagDef) {
-                const [tagValue, newOffset] = parseTagValue(data, offset, tagDef);
-                if (tagValue !== null) {
-                    parsedInfo.tags[tagHex] = {
-                        name: tagDef.name,
-                        value: tagValue,
-                        type: tagDef.type,
-                        description: tagDef.description
-                    };
-                    
-                    // Add to parameters for easy access
-                    parsedInfo.parameters[tagDef.name] = tagValue;
-                }
-                offset = newOffset;
-            } else {
-                // Unknown tag, skip it
-                offset++;
+        // Combine all tags from all records
+        parsedInfo.tags = {};
+        parsedInfo.parameters = {};
+        parsedInfo.records.forEach(record => {
+            if (record.tags) {
+                Object.assign(parsedInfo.tags, record.tags);
             }
-        } catch (error) {
-            // Skip this tag and continue
-            offset++;
-        }
+            if (record.parameters) {
+                Object.assign(parsedInfo.parameters, record.parameters);
+            }
+        });
     }
     
     // Extract common parameters for easy access
@@ -227,15 +230,6 @@ function parsePacketData(buffer) {
         parsedInfo.status = parsedInfo.parameters['Status'];
     }
     
-    // Add status based on packet type
-    if (parsedInfo.header === 0x01) {
-        parsedInfo.packetType = 'Main Packet';
-    } else if (parsedInfo.header === 0x15) {
-        parsedInfo.packetType = 'Ignorable Packet';
-    } else {
-        parsedInfo.packetType = 'Extension Packet';
-    }
-    
     // If no device ID found, create one from the packet hash
     if (!parsedInfo.deviceId) {
         const hash = require('crypto').createHash('md5').update(data).digest('hex').substring(0, 8);
@@ -243,6 +237,152 @@ function parsePacketData(buffer) {
     }
     
     return parsedInfo;
+}
+
+// Parse single record (for packets < 32 bytes)
+function parseSingleRecord(buffer, offset) {
+    const record = {
+        tags: {},
+        parameters: {}
+    };
+    
+    let currentOffset = offset;
+    
+    while (currentOffset < buffer.length - 2) { // -2 for CRC
+        const tag = buffer.readUInt8(currentOffset);
+        
+        // Stop if we encounter a null byte (separator)
+        if (tag === 0) {
+            break;
+        }
+        
+        try {
+            const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+            const tagDef = getTagDefinition(tagHex);
+            
+            if (tagDef) {
+                const [tagValue, newOffset] = parseTagValue(buffer, currentOffset, tagDef);
+                if (tagValue !== null) {
+                    record.tags[tagHex] = {
+                        name: tagDef.name,
+                        value: tagValue,
+                        type: tagDef.type,
+                        description: tagDef.description
+                    };
+                    
+                    // Add to parameters for easy access
+                    record.parameters[tagDef.name] = tagValue;
+                }
+                currentOffset = newOffset;
+            } else {
+                // Unknown tag, skip it
+                currentOffset++;
+            }
+        } catch (error) {
+            // Skip this tag and continue
+            currentOffset++;
+        }
+    }
+    
+    return record;
+}
+
+// Parse multiple records (for packets >= 32 bytes)
+function parseMultipleRecords(buffer) {
+    const records = [];
+    let currentOffset = 0;
+    
+    // Look for 0x10 tags to identify multiple records
+    while (currentOffset < buffer.length - 2) { // -2 for CRC
+        // Find the next 0x10 tag (Archive Record Number)
+        let recordStart = -1;
+        for (let i = currentOffset; i < buffer.length - 2; i++) {
+            if (buffer.readUInt8(i) === 0x10) {
+                recordStart = i;
+                break;
+            }
+        }
+        
+        if (recordStart === -1) {
+            // No more 0x10 tags found
+            break;
+        }
+        
+        // Parse this record
+        const record = { tags: {} };
+        let recordOffset = recordStart;
+        
+        while (recordOffset < buffer.length - 2) {
+            const tag = buffer.readUInt8(recordOffset);
+            recordOffset++;
+            
+            // Stop if we encounter another 0x10 tag (next record)
+            if (tag === 0x10 && recordOffset > recordStart + 1) {
+                recordOffset--;
+                break;
+            }
+            
+            // Stop if we encounter a null byte (separator)
+            if (tag === 0) {
+                break;
+            }
+            
+            try {
+                const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+                const tagDef = getTagDefinition(tagHex);
+                
+                if (tagDef) {
+                    const [tagValue, newOffset] = parseTagValue(buffer, recordOffset, tagDef);
+                    if (tagValue !== null) {
+                        record.tags[tagHex] = {
+                            name: tagDef.name,
+                            value: tagValue,
+                            type: tagDef.type,
+                            description: tagDef.description
+                        };
+                    }
+                    recordOffset = newOffset;
+                } else {
+                    // Unknown tag, skip it
+                    recordOffset++;
+                }
+            } catch (error) {
+                // Skip this tag and continue
+                recordOffset++;
+            }
+        }
+        
+        // Add record if it has tags
+        if (Object.keys(record.tags).length > 0) {
+            records.push(record);
+        }
+        
+        // Move to next potential record
+        currentOffset = recordStart + 1;
+    }
+    
+    return records;
+}
+
+// Parse ignorable packet (0x15)
+function parseIgnorablePacket(buffer) {
+    return {
+        tags: {},
+        parameters: {},
+        packetType: 'Ignorable Packet',
+        message: 'Ignorable packet - only confirmation needed'
+    };
+}
+
+// Parse extension packet
+function parseExtensionPacket(buffer) {
+    return {
+        tags: {},
+        parameters: {},
+        packetType: 'Extension Packet',
+        rawData: buffer.toString('hex').toUpperCase(),
+        message: 'Extension packet - raw data only'
+    };
 }
 
 // Get tag definition
@@ -374,10 +514,18 @@ function parseTagValue(buffer, offset, tagDef) {
                 break;
 
             case 'coordinates':
-                const lat = buffer.readInt32LE(offset) / 10000000;
-                const lon = buffer.readInt32LE(offset + 4) / 10000000;
-                const satellites = buffer.readUInt8(offset + 8);
-                value = { latitude: lat, longitude: lon, satellites };
+                const satellites = buffer.readUInt8(offset) & 0x0F;
+                const correctness = (buffer.readUInt8(offset) >> 4) & 0x0F;
+                const lat = buffer.readInt32LE(offset + 1) / 1000000;
+                const lon = buffer.readInt32LE(offset + 5) / 1000000;
+                value = { 
+                    latitude: lat, 
+                    longitude: lon, 
+                    satellites,
+                    correctness,
+                    source: correctness === 0 ? 'GPS/GLONASS' : 
+                           correctness === 2 ? 'Cellular' : 'Unknown'
+                };
                 bytesRead = 9;
                 break;
 
