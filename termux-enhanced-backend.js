@@ -130,7 +130,7 @@ function validatePacket(buffer) {
     };
 }
 
-// Parse packet data and extract useful information
+// Parse packet data and extract useful information using proper tag parsing
 function parsePacketData(buffer) {
     const packetInfo = validatePacket(buffer);
     
@@ -139,103 +139,101 @@ function parsePacketData(buffer) {
     const dataEnd = packetInfo.expectedLength;
     const data = buffer.slice(dataStart, dataEnd);
     
-    // Try to extract basic information from the data
+    // Basic packet info
     const parsedInfo = {
         header: packetInfo.header,
         hasUnsentData: packetInfo.hasUnsentData,
         length: packetInfo.actualLength,
         timestamp: new Date().toISOString(),
-        rawData: data.toString('hex').toUpperCase()
+        rawData: data.toString('hex').toUpperCase(),
+        tags: {},
+        parameters: {}
     };
     
-    // Try to extract IMEI if present (common in Galileosky packets)
-    if (data.length >= 15) {
-        // Look for IMEI pattern (15 digits) in the data
-        const dataHex = data.toString('hex');
-        const imeiMatch = dataHex.match(/([0-9a-f]{15})/i);
-        if (imeiMatch) {
-            parsedInfo.imei = imeiMatch[1];
-            parsedInfo.deviceId = imeiMatch[1];
+    // Parse all tags in the packet
+    let offset = 0;
+    while (offset < data.length) {
+        const tag = data.readUInt8(offset);
+        
+        // Stop if we encounter a null byte (separator)
+        if (tag === 0) {
+            break;
+        }
+        
+        try {
+            const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+            const tagDef = getTagDefinition(tagHex);
+            
+            if (tagDef) {
+                const [tagValue, newOffset] = parseTagValue(data, offset, tagDef);
+                if (tagValue !== null) {
+                    parsedInfo.tags[tagHex] = {
+                        name: tagDef.name,
+                        value: tagValue,
+                        type: tagDef.type,
+                        description: tagDef.description
+                    };
+                    
+                    // Add to parameters for easy access
+                    parsedInfo.parameters[tagDef.name] = tagValue;
+                }
+                offset = newOffset;
+            } else {
+                // Unknown tag, skip it
+                offset++;
+            }
+        } catch (error) {
+            // Skip this tag and continue
+            offset++;
         }
     }
     
-    // Try to extract coordinates from different positions in the packet
-    // Galileosky packets can have coordinates in different formats
-    if (data.length >= 8) {
-        try {
-            // Try different coordinate extraction methods
-            
-            // Method 1: Direct 4-byte coordinates (common format)
-            for (let offset = 0; offset <= data.length - 8; offset += 2) {
-                const lat = data.readInt32LE(offset) / 1000000;
-                const lon = data.readInt32LE(offset + 4) / 1000000;
-                
-                if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-                    parsedInfo.latitude = lat;
-                    parsedInfo.longitude = lon;
-                    parsedInfo.coordinateOffset = offset;
-                    break;
-                }
-            }
-            
-            // Method 2: If no coordinates found, try with different scaling
-            if (!parsedInfo.latitude && !parsedInfo.longitude) {
-                for (let offset = 0; offset <= data.length - 8; offset += 2) {
-                    const lat = data.readInt32LE(offset) / 100000;
-                    const lon = data.readInt32LE(offset + 4) / 100000;
-                    
-                    if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-                        parsedInfo.latitude = lat;
-                        parsedInfo.longitude = lon;
-                        parsedInfo.coordinateOffset = offset;
-                        break;
-                    }
-                }
-            }
-            
-            // Method 3: Try with different byte order (big endian)
-            if (!parsedInfo.latitude && !parsedInfo.longitude) {
-                for (let offset = 0; offset <= data.length - 8; offset += 2) {
-                    const lat = data.readInt32BE(offset) / 1000000;
-                    const lon = data.readInt32BE(offset + 4) / 1000000;
-                    
-                    if (lat !== 0 && lon !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-                        parsedInfo.latitude = lat;
-                        parsedInfo.longitude = lon;
-                        parsedInfo.coordinateOffset = offset;
-                        break;
-                    }
-                }
-            }
-            
-        } catch (e) {
-            // Ignore coordinate parsing errors
-        }
+    // Extract common parameters for easy access
+    if (parsedInfo.parameters['IMEI']) {
+        parsedInfo.imei = parsedInfo.parameters['IMEI'];
+        parsedInfo.deviceId = parsedInfo.parameters['IMEI'];
     }
     
-    // Try to extract speed if coordinates were found
-    if (parsedInfo.latitude && parsedInfo.longitude && parsedInfo.coordinateOffset) {
-        try {
-            // Speed is often stored near coordinates
-            const speedOffset = parsedInfo.coordinateOffset + 8;
-            if (speedOffset + 2 <= data.length) {
-                const speed = data.readUInt16LE(speedOffset) / 10; // Convert to km/h
-                if (speed >= 0 && speed <= 1000) {
-                    parsedInfo.speed = speed;
-                }
-            }
-        } catch (e) {
-            // Ignore speed parsing errors
-        }
+    if (parsedInfo.parameters['Coordinates']) {
+        const coords = parsedInfo.parameters['Coordinates'];
+        parsedInfo.latitude = coords.latitude;
+        parsedInfo.longitude = coords.longitude;
+        parsedInfo.satellites = coords.satellites;
+    }
+    
+    if (parsedInfo.parameters['Speed and Direction']) {
+        const speedDir = parsedInfo.parameters['Speed and Direction'];
+        parsedInfo.speed = speedDir.speed;
+        parsedInfo.direction = speedDir.direction;
+    }
+    
+    if (parsedInfo.parameters['Height']) {
+        parsedInfo.height = parsedInfo.parameters['Height'];
+    }
+    
+    if (parsedInfo.parameters['Supply Voltage']) {
+        parsedInfo.supplyVoltage = parsedInfo.parameters['Supply Voltage'];
+    }
+    
+    if (parsedInfo.parameters['Battery Voltage']) {
+        parsedInfo.batteryVoltage = parsedInfo.parameters['Battery Voltage'];
+    }
+    
+    if (parsedInfo.parameters['Inside Temperature']) {
+        parsedInfo.temperature = parsedInfo.parameters['Inside Temperature'];
+    }
+    
+    if (parsedInfo.parameters['Status']) {
+        parsedInfo.status = parsedInfo.parameters['Status'];
     }
     
     // Add status based on packet type
     if (parsedInfo.header === 0x01) {
-        parsedInfo.status = 'Main Packet';
+        parsedInfo.packetType = 'Main Packet';
     } else if (parsedInfo.header === 0x15) {
-        parsedInfo.status = 'Ignorable Packet';
+        parsedInfo.packetType = 'Ignorable Packet';
     } else {
-        parsedInfo.status = 'Extension Packet';
+        parsedInfo.packetType = 'Extension Packet';
     }
     
     // If no device ID found, create one from the packet hash
@@ -245,6 +243,186 @@ function parsePacketData(buffer) {
     }
     
     return parsedInfo;
+}
+
+// Get tag definition
+function getTagDefinition(tagHex) {
+    const tagDefinitions = {
+        // Basic Device Information
+        '0x01': { name: 'Hardware Version', type: 'uint8', length: 1, description: 'Hardware version of the device' },
+        '0x02': { name: 'Firmware Version', type: 'uint8', length: 1, description: 'Firmware version of the device' },
+        '0x03': { name: 'IMEI', type: 'string', length: 15, description: 'IMEI number of the device' },
+        '0x04': { name: 'Device Identifier', type: 'uint16', length: 2, description: 'Identifier of the device' },
+        
+        // Archive and Time Information
+        '0x10': { name: 'Archive Record Number', type: 'uint16', length: 2, description: 'Sequential number of archive record' },
+        '0x20': { name: 'Date Time', type: 'datetime', length: 4, description: 'Date and time in Unix timestamp format' },
+        '0x21': { name: 'Milliseconds', type: 'uint16', length: 2, description: 'Milliseconds (0-999) to complete date and time value' },
+        
+        // Location and Navigation
+        '0x30': { name: 'Coordinates', type: 'coordinates', length: 9, description: 'GPS/GLONASS coordinates and satellites info' },
+        '0x33': { name: 'Speed and Direction', type: 'speedDirection', length: 4, description: 'Speed in km/h and direction in degrees' },
+        '0x34': { name: 'Height', type: 'int16', length: 2, description: 'Height above sea level in meters' },
+        '0x35': { name: 'HDOP', type: 'uint8', length: 1, description: 'HDOP or cellular location error in meters' },
+        
+        // Device Status
+        '0x40': { name: 'Status', type: 'status', length: 2, description: 'Device status bits' },
+        '0x41': { name: 'Supply Voltage', type: 'uint16', length: 2, description: 'Supply voltage in mV' },
+        '0x42': { name: 'Battery Voltage', type: 'uint16', length: 2, description: 'Battery voltage in mV' },
+        '0x43': { name: 'Inside Temperature', type: 'int8', length: 1, description: 'Internal temperature in °C' },
+        '0x44': { name: 'Acceleration', type: 'uint32', length: 4, description: 'Acceleration' },
+        '0x45': { name: 'Status of outputs', type: 'outputs', length: 2, description: 'Status of outputs' },
+        '0x46': { name: 'Status of inputs', type: 'inputs', length: 2, description: 'Status of inputs' },
+        '0x47': { name: 'ECO and driving style', type: 'uint32', length: 4, description: 'ECO and driving style' },
+        '0x48': { name: 'Expanded status of the device', type: 'uint16', length: 2, description: 'Expanded status of the device' },
+        '0x49': { name: 'Transmission channel', type: 'uint8', length: 1, description: 'Transmission channel' },
+        
+        // Input voltages
+        '0x50': { name: 'Input voltage 0', type: 'uint16', length: 2, description: 'Input voltage 0' },
+        '0x51': { name: 'Input voltage 1', type: 'uint16', length: 2, description: 'Input voltage 1' },
+        '0x52': { name: 'Input voltage 2', type: 'uint16', length: 2, description: 'Input voltage 2' },
+        '0x53': { name: 'Input voltage 3', type: 'uint16', length: 2, description: 'Input voltage 3' },
+        '0x54': { name: 'Input 4 Values', type: 'uint16', length: 2, description: 'Input 4 Values' },
+        '0x55': { name: 'Input 5 Values', type: 'uint16', length: 2, description: 'Input 5 Values' },
+        '0x56': { name: 'Input 6 Values', type: 'uint16', length: 2, description: 'Input 6 Values' },
+        '0x57': { name: 'Input 7 Values', type: 'uint16', length: 2, description: 'Input 7 Values' },
+        '0x58': { name: 'RS232 0', type: 'uint16', length: 2, description: 'RS232 0' },
+        '0x59': { name: 'RS232 1', type: 'uint16', length: 2, description: 'RS232 1' },
+        
+        // GSM Information
+        '0x60': { name: 'GSM Network Code', type: 'uint32', length: 4, description: 'GSM network code (extended)' },
+        '0x61': { name: 'GSM Location Area Code', type: 'uint32', length: 4, description: 'GSM location area code (extended)' },
+        '0x62': { name: 'GSM Signal Level', type: 'uint8', length: 1, description: 'GSM signal level (0-31)' },
+        '0x63': { name: 'GSM Cell ID', type: 'uint16', length: 2, description: 'GSM cell identifier' },
+        '0x64': { name: 'GSM Area Code', type: 'uint16', length: 2, description: 'GSM area code' },
+        '0x65': { name: 'GSM Operator Code', type: 'uint16', length: 2, description: 'GSM operator code' },
+        '0x66': { name: 'GSM Base Station', type: 'uint16', length: 2, description: 'GSM base station identifier' },
+        '0x67': { name: 'GSM Country Code', type: 'uint16', length: 2, description: 'GSM country code' },
+        '0x68': { name: 'GSM Network Code', type: 'uint16', length: 2, description: 'GSM network code' },
+        '0x69': { name: 'GSM Location Area Code', type: 'uint16', length: 2, description: 'GSM location area code' },
+        
+        // Sensors
+        '0x73': { name: 'Temperature Sensor', type: 'int16', length: 2, description: 'Temperature sensor reading in °C' },
+        '0x74': { name: 'Humidity Sensor', type: 'uint8', length: 1, description: 'Humidity sensor reading in %' },
+        '0x75': { name: 'Pressure Sensor', type: 'uint16', length: 2, description: 'Pressure sensor reading in hPa' },
+        '0x76': { name: 'Light Sensor', type: 'uint16', length: 2, description: 'Light sensor reading in lux' },
+        '0x77': { name: 'Accelerometer', type: 'int16', length: 2, description: 'Accelerometer readings (X, Y, Z) in m/s²' },
+        
+        // User data
+        '0xe2': { name: 'User data 0', type: 'uint32', length: 4, description: 'User data 0' },
+        '0xe3': { name: 'User data 1', type: 'uint32', length: 4, description: 'User data 1' },
+        '0xe4': { name: 'User data 2', type: 'uint32', length: 4, description: 'User data 2' },
+        '0xe5': { name: 'User data 3', type: 'uint32', length: 4, description: 'User data 3' },
+        '0xe6': { name: 'User data 4', type: 'uint32', length: 4, description: 'User data 4' },
+        '0xe7': { name: 'User data 5', type: 'uint32', length: 4, description: 'User data 5' },
+        '0xe8': { name: 'User data 6', type: 'uint32', length: 4, description: 'User data 6' },
+        '0xe9': { name: 'User data 7', type: 'uint32', length: 4, description: 'User data 7' }
+    };
+    
+    return tagDefinitions[tagHex];
+}
+
+// Parse tag value based on type
+function parseTagValue(buffer, offset, tagDef) {
+    const tag = buffer.readUInt8(offset);
+    offset++; // Skip tag byte
+    
+    try {
+        let value;
+        let bytesRead = 0;
+
+        switch (tagDef.type) {
+            case 'uint8':
+                value = buffer.readUInt8(offset);
+                bytesRead = 1;
+                break;
+
+            case 'uint16':
+                value = buffer.readUInt16LE(offset);
+                bytesRead = 2;
+                break;
+
+            case 'uint32':
+                value = buffer.readUInt32LE(offset);
+                bytesRead = 4;
+                break;
+
+            case 'int8':
+                value = buffer.readInt8(offset);
+                bytesRead = 1;
+                break;
+
+            case 'int16':
+                value = buffer.readInt16LE(offset);
+                bytesRead = 2;
+                break;
+
+            case 'int32':
+                value = buffer.readInt32LE(offset);
+                bytesRead = 4;
+                break;
+
+            case 'string':
+                if (tagDef.length) {
+                    value = buffer.slice(offset, offset + tagDef.length).toString('ascii');
+                    bytesRead = tagDef.length;
+                } else {
+                    const strLength = buffer.readUInt8(offset);
+                    value = buffer.slice(offset + 1, offset + 1 + strLength).toString('ascii');
+                    bytesRead = strLength + 1;
+                }
+                break;
+
+            case 'coordinates':
+                const lat = buffer.readInt32LE(offset) / 10000000;
+                const lon = buffer.readInt32LE(offset + 4) / 10000000;
+                const satellites = buffer.readUInt8(offset + 8);
+                value = { latitude: lat, longitude: lon, satellites };
+                bytesRead = 9;
+                break;
+
+            case 'speedDirection':
+                const speed = buffer.readUInt16LE(offset) / 10; // Convert to km/h
+                const direction = buffer.readUInt16LE(offset + 2);
+                value = { speed, direction };
+                bytesRead = 4;
+                break;
+
+            case 'datetime':
+                value = new Date(buffer.readUInt32LE(offset) * 1000);
+                bytesRead = 4;
+                break;
+
+            case 'status':
+                value = buffer.readUInt16LE(offset);
+                bytesRead = 2;
+                break;
+
+            case 'outputs':
+                value = buffer.readUInt16LE(offset);
+                bytesRead = 2;
+                break;
+
+            case 'inputs':
+                value = buffer.readUInt16LE(offset);
+                bytesRead = 2;
+                break;
+
+            default:
+                // For unknown types, try to read as many bytes as specified
+                if (tagDef.length && offset + tagDef.length <= buffer.length) {
+                    value = buffer.slice(offset, offset + tagDef.length).toString('hex').toUpperCase();
+                    bytesRead = tagDef.length;
+                } else {
+                    return [null, offset];
+                }
+        }
+
+        return [value, offset + bytesRead];
+
+    } catch (error) {
+        return [null, offset];
+    }
 }
 
 // Add parsed data to storage

@@ -1,34 +1,31 @@
 #!/bin/bash
 
-echo "🚀 Starting Enhanced Galileosky Backend with Frontend..."
-echo ""
+echo "🚀 Starting Galileosky Enhanced Parser Backend..."
+echo "================================================"
 
-# Check if files exist
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js is not installed. Please install Node.js first."
+    exit 1
+fi
+
+# Check if the enhanced backend file exists
 if [ ! -f "termux-enhanced-backend.js" ]; then
-    echo "❌ Enhanced backend file not found!"
-    echo "Please run: bash setup-enhanced-backend.sh"
+    echo "❌ Enhanced backend file not found: termux-enhanced-backend.js"
     exit 1
 fi
 
-if [ ! -f "simple-frontend.html" ]; then
-    echo "❌ Frontend file not found!"
-    echo "Please run: bash setup-enhanced-backend.sh"
-    exit 1
-fi
-
-# Get IP address
-IP_ADDRESS=$(ip route get 1 | awk '{print $7; exit}')
-if [ -z "$IP_ADDRESS" ]; then
-    IP_ADDRESS="localhost"
-fi
-
-echo "✅ Starting servers..."
-echo "📱 Frontend will be available at: http://$IP_ADDRESS:3001"
-echo "🔧 TCP server for devices: Port 3003"
-echo "🌐 HTTP server for frontend: Port 3001"
-echo ""
-echo "Press Ctrl+C to stop the servers"
-echo ""
+# Get the device IP address
+DEVICE_IP=$(hostname -I | awk '{print $1}')
+echo "📍 Device IP: $DEVICE_IP"
 
 # Start the enhanced backend
+echo "🔄 Starting enhanced backend with full parameter parsing..."
+echo "📡 Backend will listen on port 3001"
+echo "🌐 Frontend will be available at: http://$DEVICE_IP:3001"
+echo ""
+echo "Press Ctrl+C to stop the server"
+echo ""
+
+# Run the enhanced backend
 node termux-enhanced-backend.js 

@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galileosky Parser - Simple Frontend</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Galileosky Parser - Real-time Tracking</title>
     <style>
         * {
             margin: 0;
@@ -21,7 +19,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 15px;
@@ -32,13 +30,14 @@
         .header {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: white;
-            padding: 20px;
+            padding: 30px;
             text-align: center;
         }
 
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
+            font-weight: 300;
         }
 
         .header p {
@@ -47,32 +46,42 @@
         }
 
         .status-bar {
-            background: #ecf0f1;
-            padding: 15px 20px;
-            border-bottom: 1px solid #bdc3c7;
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 1px solid #e9ecef;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            font-weight: 500;
         }
 
         .status-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            background: #e74c3c;
             animation: pulse 2s infinite;
         }
 
         .status-dot.connected {
-            background: #27ae60;
+            background: #28a745;
+        }
+
+        .status-dot.disconnected {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .controls {
@@ -86,7 +95,7 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 500;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
@@ -94,185 +103,182 @@
         }
 
         .btn-primary {
-            background: #3498db;
+            background: #007bff;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #2980b9;
+            background: #0056b3;
+            transform: translateY(-2px);
         }
 
         .btn-success {
-            background: #27ae60;
+            background: #28a745;
             color: white;
         }
 
         .btn-success:hover {
-            background: #229954;
+            background: #1e7e34;
+            transform: translateY(-2px);
         }
 
         .btn-warning {
-            background: #f39c12;
-            color: white;
+            background: #ffc107;
+            color: #212529;
         }
 
         .btn-warning:hover {
-            background: #e67e22;
+            background: #e0a800;
+            transform: translateY(-2px);
         }
 
-        .content {
+        .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 20px;
-            min-height: 600px;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+
+        .panel h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        .data-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .data-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-value {
+            font-size: 1.2em;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .data-value.coordinates {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
         }
 
         .map-container {
-            background: #f8f9fa;
+            grid-column: 1 / -1;
+            background: white;
             border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #dee2e6;
+            padding: 25px;
+            border: 1px solid #e9ecef;
         }
 
         .map-container h3 {
-            padding: 15px;
-            background: #343a40;
-            color: white;
-            margin: 0;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
         }
 
         #map {
-            height: 500px;
             width: 100%;
-        }
-
-        .data-container {
-            background: #f8f9fa;
-            border-radius: 10px;
+            height: 400px;
+            border-radius: 8px;
             border: 1px solid #dee2e6;
-            overflow: hidden;
         }
 
-        .data-container h3 {
-            padding: 15px;
-            background: #343a40;
-            color: white;
-            margin: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .table-container {
+        .parameters-panel {
+            grid-column: 1 / -1;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
             max-height: 500px;
             overflow-y: auto;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .parameter-item {
+            background: #f8f9fa;
             padding: 15px;
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
             border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
         }
 
-        .data-table th,
-        .data-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .data-table th {
-            background: #495057;
-            color: white;
+        .parameter-name {
             font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            color: #495057;
+            margin-bottom: 5px;
+            font-size: 0.9em;
         }
 
-        .data-table tr:hover {
-            background: #f8f9fa;
+        .parameter-value {
+            font-size: 1.1em;
+            color: #2c3e50;
+            font-weight: 500;
+            word-break: break-all;
         }
 
-        .data-table tr:nth-child(even) {
-            background: #f8f9fa;
+        .parameter-description {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-top: 5px;
+            font-style: italic;
         }
 
         .no-data {
             text-align: center;
-            padding: 40px;
             color: #6c757d;
             font-style: italic;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        .stat-label {
-            color: #6c757d;
-            margin-top: 5px;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        @media (max-width: 768px) {
-            .content {
-                grid-template-columns: 1fr;
-            }
-            
-            .status-bar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .controls {
-                justify-content: center;
-            }
+            padding: 40px;
         }
 
         .loading {
-            display: none;
             text-align: center;
+            color: #007bff;
             padding: 20px;
-            color: #6c757d;
-        }
-
-        .loading.show {
-            display: block;
         }
 
         .spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
+            border-top: 3px solid #007bff;
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -284,345 +290,409 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🚀 Galileosky Parser</h1>
-            <p>Real-time GPS Tracking & Data Visualization</p>
+            <p>Real-time IoT Device Tracking & Data Visualization</p>
         </div>
 
         <div class="status-bar">
             <div class="status-indicator">
-                <div class="status-dot" id="connectionStatus"></div>
-                <span id="statusText">Connecting...</span>
+                <div id="statusDot" class="status-dot disconnected"></div>
+                <span id="statusText">Disconnected</span>
             </div>
             <div class="controls">
-                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
-                <button class="btn btn-success" onclick="downloadData()">📥 Download CSV</button>
+                <button class="btn btn-primary" onclick="downloadData()">📥 Download Data</button>
                 <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
+                <a href="/api/health" class="btn btn-success" target="_blank">🔧 API Health</a>
             </div>
         </div>
 
-        <div class="content">
+        <div class="main-content">
+            <div class="panel">
+                <h3>📊 Live Statistics</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div id="packetCount" class="stat-value">0</div>
+                        <div class="stat-label">Packets Received</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="deviceCount" class="stat-value">0</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="lastUpdate" class="stat-value">--</div>
+                        <div class="stat-label">Last Update</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>📍 Current Location</h3>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Device ID</div>
+                        <div id="deviceId" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Coordinates</div>
+                        <div id="coordinates" class="data-value coordinates">No GPS data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Speed</div>
+                        <div id="speed" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Direction</div>
+                        <div id="direction" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Height</div>
+                        <div id="height" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Satellites</div>
+                        <div id="satellites" class="data-value">No data</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🔋 Device Status</h3>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Supply Voltage</div>
+                        <div id="supplyVoltage" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Battery Voltage</div>
+                        <div id="batteryVoltage" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Temperature</div>
+                        <div id="temperature" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Status</div>
+                        <div id="status" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Packet Type</div>
+                        <div id="packetType" class="data-value">No data</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">IMEI</div>
+                        <div id="imei" class="data-value">No data</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="parameters-panel">
+                <h3>📋 All Parameters</h3>
+                <div id="parametersContainer">
+                    <div class="no-data">No parameters received yet</div>
+                </div>
+            </div>
+
             <div class="map-container">
-                <h3>📍 Live Tracking Map</h3>
-                <div id="map"></div>
-            </div>
-
-            <div class="data-container">
-                <h3>
-                    📊 Parsed Data
-                    <span id="dataCount">(0 records)</span>
-                </h3>
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    Loading data...
+                <h3>🗺️ Live Map</h3>
+                <div id="map">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading map...
+                    </div>
                 </div>
-                <div class="table-container">
-                    <table class="data-table" id="dataTable">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Device</th>
-                                <th>Latitude</th>
-                                <th>Longitude</th>
-                                <th>Speed</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dataTableBody">
-                            <tr>
-                                <td colspan="6" class="no-data">No data available yet...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="totalRecords">0</div>
-                <div class="stat-label">Total Records</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="activeDevices">0</div>
-                <div class="stat-label">Active Devices</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="lastUpdate">-</div>
-                <div class="stat-label">Last Update</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="avgSpeed">0</div>
-                <div class="stat-label">Avg Speed (km/h)</div>
             </div>
         </div>
     </div>
 
     <script>
-        // Configuration
-        const config = {
-            serverUrl: window.location.hostname === 'localhost' ? 'http://localhost:3001' : `http://${window.location.hostname}:3001`,
-            refreshInterval: 3000, // 3 seconds
-            maxRecords: 1000
-        };
-
-        // Global variables
         let map;
-        let markers = new Map();
-        let dataRecords = [];
-        let isConnected = false;
-        let refreshTimer;
+        let currentMarker;
+        let lastData = null;
+        let devices = new Set();
+        let packetCount = 0;
 
         // Initialize the application
         function init() {
-            initializeMap();
-            startDataRefresh();
-            updateStatus('Connecting to server...', false);
+            loadMap();
+            startPolling();
         }
 
-        // Initialize Leaflet map
-        function initializeMap() {
-            map = L.map('map').setView([0, 0], 2);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+        // Load OpenStreetMap
+        function loadMap() {
+            const mapDiv = document.getElementById('map');
+            mapDiv.innerHTML = `
+                <iframe 
+                    width="100%" 
+                    height="400" 
+                    frameborder="0" 
+                    scrolling="no" 
+                    marginheight="0" 
+                    marginwidth="0" 
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=-180,-90,180,90&layer=mapnik&marker=0,0"
+                    style="border: 1px solid #ccc; border-radius: 8px;">
+                </iframe>
+            `;
         }
 
-        // Start periodic data refresh
-        function startDataRefresh() {
-            refreshTimer = setInterval(refreshData, config.refreshInterval);
+        // Start polling for data
+        function startPolling() {
+            pollData();
+            setInterval(pollData, 2000); // Poll every 2 seconds
         }
 
-        // Refresh data from server
-        async function refreshData() {
+        // Poll data from the API
+        async function pollData() {
             try {
-                showLoading(true);
-                const response = await fetch(`${config.serverUrl}/api/data/latest`);
+                const response = await fetch('/api/data');
                 if (response.ok) {
                     const data = await response.json();
-                    if (data && Array.isArray(data) && data.length > 0) {
-                        handleDeviceData(data);
-                        updateStatus('Connected', true);
-                    } else {
-                        updateStatus('Connected (no data)', true);
-                    }
+                    updateUI(data);
+                    updateStatus(true);
                 } else {
-                    updateStatus('Server error', false);
+                    updateStatus(false);
                 }
             } catch (error) {
-                console.error('Error fetching data:', error);
-                updateStatus('Connection failed', false);
-            } finally {
-                showLoading(false);
+                console.error('Error polling data:', error);
+                updateStatus(false);
             }
         }
 
-        // Handle incoming device data
-        function handleDeviceData(data) {
-            if (!data || !Array.isArray(data)) return;
+        // Update the UI with new data
+        function updateUI(data) {
+            if (!data || !data.length) return;
+
+            const latestPacket = data[data.length - 1];
+            lastData = latestPacket;
             
-            data.forEach(record => {
-                if (record.latitude && record.longitude) {
-                    addOrUpdateMarker(record);
-                }
-                addDataRecord(record);
+            // Update statistics
+            packetCount = data.length;
+            devices.clear();
+            data.forEach(packet => {
+                if (packet.deviceId) devices.add(packet.deviceId);
             });
-            
-            updateStats();
+
+            document.getElementById('packetCount').textContent = packetCount;
+            document.getElementById('deviceCount').textContent = devices.size;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            // Update location data
+            if (latestPacket.latitude && latestPacket.longitude) {
+                document.getElementById('coordinates').textContent = 
+                    `${latestPacket.latitude.toFixed(6)}, ${latestPacket.longitude.toFixed(6)}`;
+                updateMap(latestPacket.latitude, latestPacket.longitude);
+            }
+
+            // Update device info
+            document.getElementById('deviceId').textContent = latestPacket.deviceId || 'Unknown';
+            document.getElementById('speed').textContent = latestPacket.speed ? `${latestPacket.speed.toFixed(1)} km/h` : 'No data';
+            document.getElementById('direction').textContent = latestPacket.direction ? `${latestPacket.direction}°` : 'No data';
+            document.getElementById('height').textContent = latestPacket.height ? `${latestPacket.height}m` : 'No data';
+            document.getElementById('satellites').textContent = latestPacket.satellites || 'No data';
+
+            // Update device status
+            document.getElementById('supplyVoltage').textContent = latestPacket.supplyVoltage ? `${latestPacket.supplyVoltage}mV` : 'No data';
+            document.getElementById('batteryVoltage').textContent = latestPacket.batteryVoltage ? `${latestPacket.batteryVoltage}mV` : 'No data';
+            document.getElementById('temperature').textContent = latestPacket.temperature ? `${latestPacket.temperature}°C` : 'No data';
+            document.getElementById('status').textContent = latestPacket.status || 'No data';
+            document.getElementById('packetType').textContent = latestPacket.packetType || 'No data';
+            document.getElementById('imei').textContent = latestPacket.imei || 'No data';
+
+            // Update all parameters
+            updateParameters(latestPacket);
         }
 
-        // Add or update marker on map
-        function addOrUpdateMarker(record) {
-            const deviceId = record.deviceId || record.imei || 'unknown';
-            const lat = parseFloat(record.latitude);
-            const lng = parseFloat(record.longitude);
+        // Update parameters display
+        function updateParameters(packet) {
+            const container = document.getElementById('parametersContainer');
             
-            if (isNaN(lat) || isNaN(lng)) return;
-            
-            if (markers.has(deviceId)) {
-                // Update existing marker
-                const marker = markers.get(deviceId);
-                marker.setLatLng([lat, lng]);
-                marker.bindPopup(createPopupContent(record));
-            } else {
-                // Create new marker
-                const marker = L.marker([lat, lng], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: '🚗',
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
-                    })
-                }).addTo(map);
+            if (!packet.tags || Object.keys(packet.tags).length === 0) {
+                container.innerHTML = '<div class="no-data">No parameters received yet</div>';
+                return;
+            }
+
+            const parametersHtml = Object.entries(packet.tags).map(([tagHex, tagData]) => {
+                let displayValue = tagData.value;
                 
-                marker.bindPopup(createPopupContent(record));
-                markers.set(deviceId, marker);
-            }
-            
-            // Fit map to show all markers
-            if (markers.size === 1) {
-                map.setView([lat, lng], 12);
-            } else {
-                const group = new L.featureGroup(Array.from(markers.values()));
-                map.fitBounds(group.getBounds().pad(0.1));
-            }
-        }
+                // Format different types of values
+                if (typeof tagData.value === 'object') {
+                    if (tagData.type === 'coordinates') {
+                        displayValue = `${tagData.value.latitude.toFixed(6)}, ${tagData.value.longitude.toFixed(6)} (${tagData.value.satellites} sats)`;
+                    } else if (tagData.type === 'speedDirection') {
+                        displayValue = `${tagData.value.speed.toFixed(1)} km/h, ${tagData.value.direction}°`;
+                    } else {
+                        displayValue = JSON.stringify(tagData.value);
+                    }
+                } else if (tagData.type === 'datetime') {
+                    displayValue = new Date(tagData.value).toLocaleString();
+                } else if (tagData.type === 'uint16' && tagData.name.includes('Voltage')) {
+                    displayValue = `${tagData.value} mV`;
+                } else if (tagData.type === 'int8' && tagData.name.includes('Temperature')) {
+                    displayValue = `${tagData.value}°C`;
+                } else if (tagData.type === 'int16' && tagData.name.includes('Height')) {
+                    displayValue = `${tagData.value}m`;
+                }
 
-        // Create popup content for markers
-        function createPopupContent(record) {
-            return `
-                <div style="min-width: 200px;">
-                    <h4>Device: ${record.deviceId || record.imei || 'Unknown'}</h4>
-                    <p><strong>Time:</strong> ${new Date(record.timestamp).toLocaleString()}</p>
-                    <p><strong>Location:</strong> ${record.latitude}, ${record.longitude}</p>
-                    <p><strong>Speed:</strong> ${record.speed || 0} km/h</p>
-                    <p><strong>Status:</strong> ${record.status || 'Unknown'}</p>
+                return `
+                    <div class="parameter-item">
+                        <div class="parameter-name">${tagData.name} (${tagHex})</div>
+                        <div class="parameter-value">${displayValue}</div>
+                        <div class="parameter-description">${tagData.description}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="parameters-grid">
+                    ${parametersHtml}
                 </div>
             `;
         }
 
-        // Add data record to table
-        function addDataRecord(record) {
-            // Check if record already exists (avoid duplicates)
-            const existingIndex = dataRecords.findIndex(r => 
-                r.timestamp === record.timestamp && 
-                (r.deviceId === record.deviceId || r.imei === record.imei)
-            );
-            
-            if (existingIndex === -1) {
-                // Add to beginning of array
-                dataRecords.unshift(record);
-                
-                // Limit records
-                if (dataRecords.length > config.maxRecords) {
-                    dataRecords = dataRecords.slice(0, config.maxRecords);
-                }
-                
-                updateDataTable();
-            }
-        }
-
-        // Update data table
-        function updateDataTable() {
-            const tbody = document.getElementById('dataTableBody');
-            const countElement = document.getElementById('dataCount');
-            
-            countElement.textContent = `(${dataRecords.length} records)`;
-            
-            if (dataRecords.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No data available yet...</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = dataRecords.map(record => `
-                <tr>
-                    <td>${new Date(record.timestamp).toLocaleString()}</td>
-                    <td>${record.deviceId || record.imei || 'Unknown'}</td>
-                    <td>${record.latitude ? parseFloat(record.latitude).toFixed(6) : '-'}</td>
-                    <td>${record.longitude ? parseFloat(record.longitude).toFixed(6) : '-'}</td>
-                    <td>${record.speed ? parseFloat(record.speed).toFixed(1) + ' km/h' : '-'}</td>
-                    <td>${record.status || 'Unknown'}</td>
-                </tr>
-            `).join('');
-        }
-
-        // Update statistics
-        function updateStats() {
-            document.getElementById('totalRecords').textContent = dataRecords.length;
-            
-            const uniqueDevices = new Set(dataRecords.map(r => r.deviceId || r.imei)).size;
-            document.getElementById('activeDevices').textContent = uniqueDevices;
-            
-            if (dataRecords.length > 0) {
-                const lastRecord = dataRecords[0];
-                document.getElementById('lastUpdate').textContent = 
-                    new Date(lastRecord.timestamp).toLocaleTimeString();
-                
-                const speeds = dataRecords
-                    .map(r => parseFloat(r.speed))
-                    .filter(s => !isNaN(s));
-                
-                const avgSpeed = speeds.length > 0 
-                    ? (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1)
-                    : '0';
-                document.getElementById('avgSpeed').textContent = avgSpeed;
+        // Update map with new coordinates
+        function updateMap(lat, lon) {
+            const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.01},${lat-0.01},${lon+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lon}`;
+            const mapFrame = document.querySelector('#map iframe');
+            if (mapFrame) {
+                mapFrame.src = mapUrl;
             }
         }
 
         // Update connection status
-        function updateStatus(message, connected) {
-            const statusDot = document.getElementById('connectionStatus');
+        function updateStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
             
-            statusText.textContent = message;
-            statusDot.className = 'status-dot' + (connected ? ' connected' : '');
-        }
-
-        // Show/hide loading indicator
-        function showLoading(show) {
-            const loading = document.getElementById('loading');
-            loading.className = show ? 'loading show' : 'loading';
-        }
-
-        // Download data as CSV
-        function downloadData() {
-            if (dataRecords.length === 0) {
-                alert('No data to download');
-                return;
+            if (connected) {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Disconnected';
             }
-            
-            const headers = ['Time', 'Device ID', 'Latitude', 'Longitude', 'Speed (km/h)', 'Status'];
-            const csvContent = [
-                headers.join(','),
-                ...dataRecords.map(record => [
-                    new Date(record.timestamp).toISOString(),
-                    record.deviceId || record.imei || 'Unknown',
-                    record.latitude || '',
-                    record.longitude || '',
-                    record.speed || '',
-                    record.status || ''
-                ].join(','))
-            ].join('\n');
-            
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `galileosky_data_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
         }
 
-        // Clear all data
-        function clearData() {
-            if (confirm('Are you sure you want to clear all data?')) {
-                dataRecords = [];
-                markers.clear();
-                map.eachLayer(layer => {
-                    if (layer instanceof L.Marker) {
-                        map.removeLayer(layer);
+        // Download data as JSON
+        async function downloadData() {
+            try {
+                const response = await fetch('/api/data');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Create a comprehensive download with all parameters
+                    const downloadData = data.map(packet => ({
+                        timestamp: packet.timestamp,
+                        deviceId: packet.deviceId,
+                        imei: packet.imei,
+                        packetType: packet.packetType,
+                        header: packet.header,
+                        hasUnsentData: packet.hasUnsentData,
+                        length: packet.length,
+                        rawData: packet.rawData,
+                        // Location data
+                        latitude: packet.latitude,
+                        longitude: packet.longitude,
+                        speed: packet.speed,
+                        direction: packet.direction,
+                        height: packet.height,
+                        satellites: packet.satellites,
+                        // Device status
+                        supplyVoltage: packet.supplyVoltage,
+                        batteryVoltage: packet.batteryVoltage,
+                        temperature: packet.temperature,
+                        status: packet.status,
+                        // All parsed parameters
+                        parameters: packet.parameters,
+                        tags: packet.tags
+                    }));
+
+                    const blob = new Blob([JSON.stringify(downloadData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            } catch (error) {
+                console.error('Error downloading data:', error);
+                alert('Error downloading data. Please try again.');
+            }
+        }
+
+        // Clear stored data
+        async function clearData() {
+            if (confirm('Are you sure you want to clear all stored data?')) {
+                try {
+                    const response = await fetch('/api/clear', { method: 'POST' });
+                    if (response.ok) {
+                        // Reset UI
+                        document.getElementById('packetCount').textContent = '0';
+                        document.getElementById('deviceCount').textContent = '0';
+                        document.getElementById('lastUpdate').textContent = '--';
+                        document.getElementById('parametersContainer').innerHTML = '<div class="no-data">No parameters received yet</div>';
+                        
+                        // Reset location data
+                        document.getElementById('coordinates').textContent = 'No GPS data';
+                        document.getElementById('deviceId').textContent = 'No data';
+                        document.getElementById('speed').textContent = 'No data';
+                        document.getElementById('direction').textContent = 'No data';
+                        document.getElementById('height').textContent = 'No data';
+                        document.getElementById('satellites').textContent = 'No data';
+                        
+                        // Reset device status
+                        document.getElementById('supplyVoltage').textContent = 'No data';
+                        document.getElementById('batteryVoltage').textContent = 'No data';
+                        document.getElementById('temperature').textContent = 'No data';
+                        document.getElementById('status').textContent = 'No data';
+                        document.getElementById('packetType').textContent = 'No data';
+                        document.getElementById('imei').textContent = 'No data';
+                        
+                        alert('Data cleared successfully!');
                     }
-                });
-                updateDataTable();
-                updateStats();
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                    alert('Error clearing data. Please try again.');
+                }
             }
         }
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', init);
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-            }
-        });
     </script>
 </body>
 </html> 
