@@ -700,6 +700,16 @@ function handleAPIRequest(req, res) {
             const stats = getDeviceStats();
             res.writeHead(200);
             res.end(JSON.stringify(stats));
+        } else if (pathname === '/api/health') {
+            res.writeHead(200);
+            res.end(JSON.stringify({ 
+                status: 'ok', 
+                timestamp: new Date().toISOString(),
+                uptime: process.uptime(),
+                activeConnections: activeConnections.size,
+                totalDevices: devices.size,
+                totalRecords: parsedData.length
+            }));
         } else if (pathname === '/api/devices') {
             const deviceList = Array.from(devices.entries()).map(([id, info]) => ({
                 deviceId: id,

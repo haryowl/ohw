@@ -476,7 +476,7 @@
         // Poll data from the API
         async function pollData() {
             try {
-                const response = await fetch('/api/data');
+                const response = await fetch('/api/data/latest');
                 if (response.ok) {
                     const data = await response.json();
                     updateUI(data);
@@ -607,7 +607,7 @@
         // Download data as JSON
         async function downloadData() {
             try {
-                const response = await fetch('/api/data');
+                const response = await fetch('/api/data/latest?limit=1000');
                 if (response.ok) {
                     const data = await response.json();
                     
