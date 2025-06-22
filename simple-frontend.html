@@ -643,6 +643,22 @@
                 </div>
             </div>
 
+            <!-- Live Map (moved up) -->
+            <div class="map-container foldable-section">
+                <div class="foldable-header" onclick="toggleSection('map')">
+                    <h3 class="foldable-title">🗺️ Live Map</h3>
+                    <span class="foldable-icon" id="map-icon">▼</span>
+                </div>
+                <div class="foldable-content" id="map-content">
+                    <div id="map">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading map...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Current Location -->
             <div class="foldable-section">
                 <div class="foldable-header" onclick="toggleSection('location')">
@@ -724,22 +740,6 @@
                 <div class="foldable-content" id="parameters-content">
                     <div id="parametersContainer">
                         <div class="no-data">No parameters received yet</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Live Map -->
-            <div class="map-container foldable-section">
-                <div class="foldable-header" onclick="toggleSection('map')">
-                    <h3 class="foldable-title">🗺️ Live Map</h3>
-                    <span class="foldable-icon" id="map-icon">▼</span>
-                </div>
-                <div class="foldable-content" id="map-content">
-                    <div id="map">
-                        <div class="loading">
-                            <div class="spinner"></div>
-                            Loading map...
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1047,7 +1047,71 @@
             }
         }
 
-        // Download data with options
+        // Convert data to CSV format (flatten nested objects and include tags, userdata, modbus)
+        function flattenRecord(record) {
+            const flat = { ...record };
+            // Flatten tags
+            if (record.tags && typeof record.tags === 'object') {
+                Object.entries(record.tags).forEach(([tagKey, tagData]) => {
+                    if (typeof tagData.value === 'object' && tagData.value !== null) {
+                        Object.entries(tagData.value).forEach(([k, v]) => {
+                            flat[`tag_${tagKey}_${k}`] = v;
+                        });
+                    } else {
+                        flat[`tag_${tagKey}`] = tagData.value;
+                    }
+                });
+            }
+            // Flatten userdata
+            if (record.userdata && typeof record.userdata === 'object') {
+                Object.entries(record.userdata).forEach(([k, v]) => {
+                    flat[`userdata_${k}`] = v;
+                });
+            }
+            // Flatten modbus
+            if (record.modbus && typeof record.modbus === 'object') {
+                Object.entries(record.modbus).forEach(([k, v]) => {
+                    flat[`modbus_${k}`] = v;
+                });
+            }
+            return flat;
+        }
+
+        function convertToCSV(data) {
+            if (!data || data.length === 0) return '';
+            // Flatten all records
+            const flatData = data.map(flattenRecord);
+            // Get all possible fields
+            const allFields = new Set();
+            flatData.forEach(record => {
+                Object.keys(record).forEach(key => {
+                    if (key !== 'tags' && key !== 'rawData') {
+                        allFields.add(key);
+                    }
+                });
+            });
+            const fields = Array.from(allFields).sort();
+            const csvRows = [];
+            csvRows.push(fields.join(','));
+            flatData.forEach(record => {
+                const row = fields.map(field => {
+                    let value = record[field];
+                    if (value === null || value === undefined) {
+                        return '';
+                    } else if (typeof value === 'object') {
+                        return JSON.stringify(value);
+                    } else if (typeof value === 'string' && value.includes(',')) {
+                        return `"${value}"`;
+                    } else {
+                        return value;
+                    }
+                });
+                csvRows.push(row.join(','));
+            });
+            return csvRows.join('\n');
+        }
+
+        // Download data with options (update XLSX to use CSV, and clarify in alert)
         async function downloadData() {
             try {
                 const timePeriod = document.getElementById('timePeriod').value;
@@ -1113,7 +1177,6 @@
                         break;
                         
                     case 'xlsx':
-                        // For XLSX, we'll create a simple CSV-like structure that Excel can open
                         downloadData = convertToCSV(data);
                         filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
                         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -1132,50 +1195,16 @@
                 URL.revokeObjectURL(url);
                 
                 closeDownloadModal();
-                alert(`Data downloaded successfully! (${data.length} records)`);
+                if (format === 'xlsx') {
+                    alert('Excel (XLSX) export is CSV-compatible. For best results, use CSV format or open the .xlsx in Excel.');
+                } else {
+                    alert(`Data downloaded successfully! (${data.length} records)`);
+                }
                 
             } catch (error) {
                 console.error('Error downloading data:', error);
                 alert('Error downloading data. Please try again.');
             }
-        }
-
-        // Convert data to CSV format
-        function convertToCSV(data) {
-            if (!data || data.length === 0) return '';
-            
-            // Get all possible fields from all records
-            const allFields = new Set();
-            data.forEach(record => {
-                Object.keys(record).forEach(key => {
-                    if (key !== 'tags' && key !== 'rawData') {
-                        allFields.add(key);
-                    }
-                });
-            });
-            
-            const fields = Array.from(allFields).sort();
-            const csvRows = [];
-            
-            // Add header
-            csvRows.push(fields.join(','));
-            
-            // Add data rows
-            data.forEach(record => {
-                const row = fields.map(field => {
-                    const value = record[field];
-                    if (value === null || value === undefined) {
-                        return '';
-                    } else if (typeof value === 'string' && value.includes(',')) {
-                        return `"${value}"`;
-                    } else {
-                        return value;
-                    }
-                });
-                csvRows.push(row.join(','));
-            });
-            
-            return csvRows.join('\n');
         }
 
         // Clear stored data
