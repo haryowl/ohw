@@ -431,6 +431,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
             if (Object.keys(record.tags).length > 0) {
                 result.records.push(record);
+                console.log('Extracted tags:', Object.keys(record.tags));
+                console.log('Sample tag data:', record.tags);
             }
         } else {
             // For packets >= 32 bytes, check if there's a 0x10 tag (Number Archive Records)
@@ -594,6 +596,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
                     if (Object.keys(record.tags).length > 0) {
                         result.records.push(record);
+                        console.log('Extracted tags:', Object.keys(record.tags));
+                        console.log('Sample tag data:', record.tags);
                     }
 
                     currentOffset = recordOffset;
@@ -729,6 +733,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
+                    console.log('Extracted tags:', Object.keys(record.tags));
+                    console.log('Sample tag data:', record.tags);
                 }
             }
         }
@@ -801,37 +807,152 @@ async function parsePacket(buffer) {
 function addParsedData(data) {
     if (!data || typeof data !== 'object') return;
     
-    // Add timestamp if not present
-    if (!data.timestamp) {
-        data.timestamp = new Date().toISOString();
+    // If this is a main packet with records, extract data from the first record
+    if (data.records && data.records.length > 0) {
+        const record = data.records[0];
+        const tags = record.tags;
+        
+        // Extract common fields from tags
+        const extractedData = {
+            timestamp: new Date().toISOString(),
+            deviceId: 'unknown',
+            imei: null,
+            latitude: null,
+            longitude: null,
+            satellites: null,
+            correctness: null,
+            speed: null,
+            direction: null,
+            altitude: null,
+            course: null,
+            hdop: null,
+            vdop: null,
+            pdop: null,
+            temperature: null,
+            voltage: null,
+            inputs: null,
+            outputs: null,
+            status: null,
+            rawData: data,
+            tags: tags
+        };
+        
+        // Extract IMEI (tag 0x03)
+        if (tags['0x03']) {
+            extractedData.imei = tags['0x03'].value;
+            extractedData.deviceId = tags['0x03'].value;
+        }
+        
+        // Extract coordinates (tag 0x20)
+        if (tags['0x20']) {
+            const coords = tags['0x20'].value;
+            if (coords && typeof coords === 'object') {
+                extractedData.latitude = coords.latitude;
+                extractedData.longitude = coords.longitude;
+                extractedData.satellites = coords.satellites;
+                extractedData.correctness = coords.correctness;
+            }
+        }
+        
+        // Extract speed and direction (tag 0x21)
+        if (tags['0x21']) {
+            const speedDir = tags['0x21'].value;
+            if (speedDir && typeof speedDir === 'object') {
+                extractedData.speed = speedDir.speed;
+                extractedData.direction = speedDir.direction;
+            }
+        }
+        
+        // Extract altitude (tag 0x22)
+        if (tags['0x22']) {
+            extractedData.altitude = tags['0x22'].value;
+        }
+        
+        // Extract course (tag 0x23)
+        if (tags['0x23']) {
+            extractedData.course = tags['0x23'].value;
+        }
+        
+        // Extract HDOP (tag 0x24)
+        if (tags['0x24']) {
+            extractedData.hdop = tags['0x24'].value;
+        }
+        
+        // Extract VDOP (tag 0x25)
+        if (tags['0x25']) {
+            extractedData.vdop = tags['0x25'].value;
+        }
+        
+        // Extract PDOP (tag 0x26)
+        if (tags['0x26']) {
+            extractedData.pdop = tags['0x26'].value;
+        }
+        
+        // Extract temperature (tag 0x30)
+        if (tags['0x30']) {
+            extractedData.temperature = tags['0x30'].value;
+        }
+        
+        // Extract voltage (tag 0x31)
+        if (tags['0x31']) {
+            extractedData.voltage = tags['0x31'].value;
+        }
+        
+        // Extract inputs (tag 0x40)
+        if (tags['0x40']) {
+            extractedData.inputs = tags['0x40'].value;
+        }
+        
+        // Extract outputs (tag 0x41)
+        if (tags['0x41']) {
+            extractedData.outputs = tags['0x41'].value;
+        }
+        
+        // Extract status (tag 0x50)
+        if (tags['0x50']) {
+            extractedData.status = tags['0x50'].value;
+        }
+        
+        // Add to data array
+        parsedData.unshift(extractedData);
+        
+        // Limit data to last 1000 records
+        if (parsedData.length > 1000) {
+            parsedData = parsedData.slice(0, 1000);
+        }
+        
+        // Track device
+        if (extractedData.deviceId && extractedData.deviceId !== 'unknown') {
+            devices.set(extractedData.deviceId, {
+                lastSeen: new Date(),
+                lastLocation: {
+                    latitude: extractedData.latitude,
+                    longitude: extractedData.longitude
+                },
+                totalRecords: (devices.get(extractedData.deviceId)?.totalRecords || 0) + 1
+            });
+        }
+        
+        logger.info(`Added data for device: ${extractedData.deviceId || 'unknown'}`);
+        
+    } else {
+        // Handle other packet types (ignorable, extension, etc.)
+        const simpleData = {
+            timestamp: new Date().toISOString(),
+            deviceId: data.deviceId || 'unknown',
+            imei: data.imei,
+            type: data.header ? `0x${data.header.toString(16).padStart(2, '0')}` : 'unknown',
+            rawData: data
+        };
+        
+        parsedData.unshift(simpleData);
+        
+        if (parsedData.length > 1000) {
+            parsedData = parsedData.slice(0, 1000);
+        }
+        
+        logger.info(`Added data for device: ${simpleData.deviceId || 'unknown'}`);
     }
-    
-    // Add device ID if not present
-    if (!data.deviceId && data.imei) {
-        data.deviceId = data.imei;
-    }
-    
-    // Add to data array
-    parsedData.unshift(data);
-    
-    // Limit data to last 1000 records
-    if (parsedData.length > 1000) {
-        parsedData = parsedData.slice(0, 1000);
-    }
-    
-    // Track device
-    if (data.deviceId) {
-        devices.set(data.deviceId, {
-            lastSeen: new Date(),
-            lastLocation: {
-                latitude: data.latitude,
-                longitude: data.longitude
-            },
-            totalRecords: (devices.get(data.deviceId)?.totalRecords || 0) + 1
-        });
-    }
-    
-    logger.info(`Added data for device: ${data.deviceId || 'unknown'}`);
 }
 
 // Get latest data
