@@ -375,6 +375,14 @@
             font-size: 0.9em;
         }
 
+        .control-row.single-column {
+            grid-template-columns: 1fr;
+        }
+
+        .control-row.two-columns {
+            grid-template-columns: 1fr 1fr;
+        }
+
         .parameter-list {
             max-height: 300px;
             overflow-y: auto;
@@ -471,6 +479,25 @@
             
             .track-info {
                 grid-template-columns: 1fr;
+            }
+            
+            .control-row {
+                grid-template-columns: 1fr !important;
+                gap: 8px;
+            }
+            
+            .control-row.two-columns {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            
+            .parameter-item {
+                grid-template-columns: 25px 1fr;
+                gap: 8px;
+            }
+            
+            .parameter-rename {
+                grid-column: 1 / -1;
+                margin-top: 5px;
             }
             
             #map, #trackingMap {
@@ -588,10 +615,12 @@
                 <div class="export-controls">
                     <div class="export-section">
                         <h4>Device & Period Selection</h4>
-                        <div class="control-row">
+                        <div class="control-row single-column">
                             <select id="exportDeviceSelect">
                                 <option value="">Select Device</option>
                             </select>
+                        </div>
+                        <div class="control-row two-columns">
                             <input type="datetime-local" id="exportStartDate" />
                             <input type="datetime-local" id="exportEndDate" />
                         </div>
