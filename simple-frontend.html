@@ -445,6 +445,7 @@
                     <input type="datetime-local" id="startDate" />
                     <input type="datetime-local" id="endDate" />
                     <button class="btn btn-primary" onclick="loadTrackingData()">Load Track</button>
+                    <button class="btn btn-success" onclick="downloadTrackingData()">Download Period CSV</button>
                 </div>
             </div>
 
@@ -1013,41 +1014,20 @@
             }
             
             const latestData = dataRecords[0];
-            const html = `
-                <div class="data-item">
-                    <div class="data-label">Device ID</div>
-                    <div class="data-value">${latestData.deviceId || latestData.imei || 'Unknown'}</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-label">Timestamp</div>
-                    <div class="data-value">${new Date(latestData.timestamp).toLocaleString()}</div>
-                </div>
-                ${latestData.latitude && latestData.longitude ? `
-                <div class="data-item">
-                    <div class="data-label">Coordinates</div>
-                    <div class="data-value coordinates">${latestData.latitude.toFixed(6)}, ${latestData.longitude.toFixed(6)}</div>
-                </div>
-                ` : ''}
-                ${latestData.speed ? `
-                <div class="data-item">
-                    <div class="data-label">Speed</div>
-                    <div class="data-value">${latestData.speed} km/h</div>
-                </div>
-                ` : ''}
-                ${latestData.direction ? `
-                <div class="data-item">
-                    <div class="data-label">Direction</div>
-                    <div class="data-value">${latestData.direction}°</div>
-                </div>
-                ` : ''}
-                ${latestData.voltage ? `
-                <div class="data-item">
-                    <div class="data-label">Voltage</div>
-                    <div class="data-value">${latestData.voltage}V</div>
-                </div>
-                ` : ''}
-            `;
-            
+            let html = '';
+            Object.keys(latestData).forEach(key => {
+                if (key === '__proto__') return;
+                let value = latestData[key];
+                if (typeof value === 'object' && value !== null) {
+                    value = JSON.stringify(value);
+                }
+                html += `
+                    <div class="data-item">
+                        <div class="data-label">${key}</div>
+                        <div class="data-value">${value}</div>
+                    </div>
+                `;
+            });
             container.innerHTML = html;
         }
 
@@ -1106,21 +1086,25 @@
                 alert('No data to download');
                 return;
             }
-            
-            const headers = ['Time', 'Device ID', 'Latitude', 'Longitude', 'Speed (km/h)', 'Direction', 'Voltage'];
+            // Collect all unique keys from all records
+            const allKeys = Array.from(new Set(dataRecords.flatMap(record => Object.keys(record))));
+            const headers = allKeys;
             const csvContent = [
                 headers.join(','),
-                ...dataRecords.map(record => [
-                    new Date(record.timestamp).toISOString(),
-                    record.deviceId || record.imei || 'Unknown',
-                    record.latitude || '',
-                    record.longitude || '',
-                    record.speed || '',
-                    record.direction || '',
-                    record.voltage || ''
-                ].join(','))
+                ...dataRecords.map(record =>
+                    headers.map(key => {
+                        let value = record[key];
+                        if (typeof value === 'object' && value !== null) {
+                            value = JSON.stringify(value);
+                        }
+                        // Escape quotes
+                        if (typeof value === 'string' && value.includes(',')) {
+                            value = '"' + value.replace(/"/g, '""') + '"';
+                        }
+                        return value !== undefined ? value : '';
+                    }).join(',')
+                )
             ].join('\n');
-            
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1135,6 +1119,58 @@
         function updateConnectionInfo() {
             document.getElementById('apiUrlDisplay').textContent = config.apiUrl;
             document.getElementById('socketUrlDisplay').textContent = config.socketUrl;
+        }
+
+        async function downloadTrackingData() {
+            const deviceId = document.getElementById('deviceSelect').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (!deviceId || !startDate || !endDate) {
+                alert('Please select device and period');
+                return;
+            }
+            try {
+                const params = new URLSearchParams({
+                    startDate: new Date(startDate).toISOString(),
+                    endDate: new Date(endDate).toISOString()
+                });
+                const response = await fetch(`${config.apiUrl}/api/data/${deviceId}/tracking?${params}`);
+                if (!response.ok) throw new Error('Failed to fetch tracking data');
+                const data = await response.json();
+                if (!data.length) {
+                    alert('No data for selected period');
+                    return;
+                }
+                // Collect all unique keys
+                const allKeys = Array.from(new Set(data.flatMap(record => Object.keys(record))));
+                const headers = allKeys;
+                const csvContent = [
+                    headers.join(','),
+                    ...data.map(record =>
+                        headers.map(key => {
+                            let value = record[key];
+                            if (typeof value === 'object' && value !== null) {
+                                value = JSON.stringify(value);
+                            }
+                            if (typeof value === 'string' && value.includes(',')) {
+                                value = '"' + value.replace(/"/g, '""') + '"';
+                            }
+                            return value !== undefined ? value : '';
+                        }).join(',')
+                    )
+                ].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tracking_data_${deviceId}_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Download failed: ' + err.message);
+            }
         }
 
         // Cleanup on page unload
