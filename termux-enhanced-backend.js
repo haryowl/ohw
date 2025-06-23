@@ -473,21 +473,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                         recordOffset += 4;
                         break;
                     case 'string':
-                        // Special handling for IMEI (tag 0x03) - decode as BCD
-                        if (tag === 0x03) {
-                            // IMEI is stored as BCD (Binary Coded Decimal)
-                            const imeiBytes = buffer.slice(recordOffset, recordOffset + definition.length);
-                            let imei = '';
-                            for (let i = 0; i < imeiBytes.length; i++) {
-                                const byte = imeiBytes[i];
-                                const high = (byte >> 4) & 0x0F;
-                                const low = byte & 0x0F;
-                                imei += high.toString() + low.toString();
-                            }
-                            value = imei;
-                        } else {
-                            value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
-                        }
+                        value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
                         recordOffset += definition.length;
                         break;
                     case 'datetime':
