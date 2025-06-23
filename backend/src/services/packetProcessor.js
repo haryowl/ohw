@@ -41,6 +41,14 @@ class PacketProcessor {
                 return null;
             }
 
+            // Log the parsed data structure
+            logger.info('Parsed packet structure:', {
+                hasRecords: !!parsedData.records,
+                recordCount: parsedData.records ? parsedData.records.length : 0,
+                type: parsedData.type,
+                timestamp: new Date().toISOString()
+            });
+
             // Handle multiple records if present
             if (parsedData.records && parsedData.records.length > 1) {
                 logger.info(`Processing ${parsedData.records.length} records from packet`);
@@ -69,8 +77,8 @@ class PacketProcessor {
                         await deviceManager.updateDeviceStatus(imei, 'online');
                     }
 
-                    // Process the record
-                    const processed = await this.processMainPacket(record, device.id);
+                    // Process the record directly (it's already parsed)
+                    const processed = await this.processRecordData(record, device.id);
                     if (processed) {
                         // Map the data according to device configuration
                         const mapped = await this.mapPacketData(processed, device.id);
@@ -82,6 +90,14 @@ class PacketProcessor {
                         await this.checkAlerts(device.id, mapped);
                         
                         processedRecords.push(mapped);
+                        
+                        // Log successful record processing
+                        logger.info(`Record ${i + 1} processed successfully:`, {
+                            imei,
+                            recordNumber: i + 1,
+                            totalRecords: parsedData.records.length,
+                            timestamp: new Date().toISOString()
+                        });
                     }
                 }
                 
@@ -153,6 +169,124 @@ class PacketProcessor {
                 timestamp: new Date().toISOString()
             });
             throw error;
+        }
+    }
+
+    async processRecordData(record, deviceId) {
+        try {
+            const result = {
+                type: 'main',
+                deviceId,
+                timestamp: new Date(),
+                data: {}
+            };
+
+            // Process each tag in the record
+            for (const [tag, tagData] of Object.entries(record.tags)) {
+                const value = tagData.value !== undefined ? tagData.value : tagData;
+                
+                switch (tag) {
+                    case '0x03': // IMEI
+                        result.data.imei = value;
+                        result.data.deviceId = value;
+                        break;
+                    case '0x30': // Coordinates
+                        if (value && typeof value === 'object' && value.latitude && value.longitude) {
+                            result.data.latitude = value.latitude;
+                            result.data.longitude = value.longitude;
+                            result.data.satellites = value.satellites;
+                            result.data.coordinateCorrectness = value.correctness;
+                        }
+                        break;
+                    case '0x33': // Speed and Direction
+                        if (value && typeof value === 'object') {
+                            result.data.speed = value.speed;
+                            result.data.direction = value.direction;
+                        }
+                        break;
+                    case '0x34': // Height
+                        result.data.height = value;
+                        break;
+                    case '0x35': // HDOP
+                        result.data.hdop = value;
+                        break;
+                    case '0x40': // Status
+                        result.data.status = value;
+                        break;
+                    case '0x41': // Supply Voltage
+                        result.data.supplyVoltage = value;
+                        break;
+                    case '0x42': // Battery Voltage
+                        result.data.batteryVoltage = value;
+                        break;
+                    case '0x43': // Temperature
+                        result.data.temperature = value;
+                        break;
+                    case '0x44': // Acceleration
+                        result.data.acceleration = value;
+                        break;
+                    case '0x45': // Outputs
+                        result.data.outputs = value;
+                        break;
+                    case '0x46': // Inputs
+                        result.data.inputs = value;
+                        break;
+                    case '0x47': // ECO Driving
+                        result.data.ecoDriving = value;
+                        break;
+                    case '0x48': // Expanded Status
+                        result.data.expandedStatus = value;
+                        break;
+                    case '0x49': // Transmission Channel
+                        result.data.transmissionChannel = value;
+                        break;
+                    case '0x50': // Input Voltage 0
+                        result.data.inputVoltage0 = value;
+                        break;
+                    case '0x51': // Input Voltage 1
+                        result.data.inputVoltage1 = value;
+                        break;
+                    case '0x52': // Input Voltage 2
+                        result.data.inputVoltage2 = value;
+                        break;
+                    case '0x53': // Input Voltage 3
+                        result.data.inputVoltage3 = value;
+                        break;
+                    case '0x54': // Input Voltage 4
+                        result.data.inputVoltage4 = value;
+                        break;
+                    case '0x55': // Input Voltage 5
+                        result.data.inputVoltage5 = value;
+                        break;
+                    case '0x56': // Input Voltage 6
+                        result.data.inputVoltage6 = value;
+                        break;
+                    case '0x20': // Date/Time
+                        result.data.timestamp = value;
+                        break;
+                    case '0x21': // Milliseconds
+                        result.data.milliseconds = value;
+                        break;
+                    case '0x10': // Record Number
+                        result.data.recordNumber = value;
+                        break;
+                    default:
+                        // Handle extended tags and user data
+                        if (tag.startsWith('0x')) {
+                            result.data[tag] = value;
+                        }
+                        break;
+                }
+            }
+
+            return result;
+        } catch (error) {
+            logger.error('Error processing record data:', {
+                error: error.message,
+                deviceId,
+                timestamp: new Date().toISOString()
+            });
+            return null;
         }
     }
 
