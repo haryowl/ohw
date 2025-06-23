@@ -20,6 +20,7 @@ const OfflineMapLayer = () => {
         this._container.style.pointerEvents = 'none';
         this._container.style.zIndex = '1';
         
+        // Add to overlay pane so it's below markers
         map.getPanes().overlayPane.appendChild(this._container);
         this._redraw();
         
@@ -29,7 +30,9 @@ const OfflineMapLayer = () => {
       },
 
       onRemove: function(map) {
-        L.DomUtil.remove(this._container);
+        if (this._container && this._container.parentNode) {
+          this._container.parentNode.removeChild(this._container);
+        }
         map.off('viewreset', this._redraw, this);
         map.off('zoom', this._redraw, this);
         map.off('move', this._redraw, this);
@@ -60,37 +63,42 @@ const OfflineMapLayer = () => {
         canvas.style.top = '0';
         canvas.style.left = '0';
         canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
         
         this._container.appendChild(canvas);
 
         // Calculate grid spacing based on zoom level
         const gridSpacing = this._getGridSpacing(zoom);
         
-        // Draw vertical lines
+        // Draw vertical lines (longitude)
         const startLng = Math.floor(bounds.getWest() / gridSpacing) * gridSpacing;
         const endLng = Math.ceil(bounds.getEast() / gridSpacing) * gridSpacing;
         
         for (let lng = startLng; lng <= endLng; lng += gridSpacing) {
-          const point = this._map.latLngToLayerPoint([bounds.getCenter().lat, lng]);
+          const startPoint = this._map.latLngToLayerPoint([bounds.getSouth(), lng]);
+          const endPoint = this._map.latLngToLayerPoint([bounds.getNorth(), lng]);
+          
           ctx.beginPath();
           ctx.strokeStyle = '#e0e0e0';
           ctx.lineWidth = 1;
-          ctx.moveTo(point.x, 0);
-          ctx.lineTo(point.x, size.y);
+          ctx.moveTo(startPoint.x, startPoint.y);
+          ctx.lineTo(endPoint.x, endPoint.y);
           ctx.stroke();
         }
 
-        // Draw horizontal lines
+        // Draw horizontal lines (latitude)
         const startLat = Math.floor(bounds.getSouth() / gridSpacing) * gridSpacing;
         const endLat = Math.ceil(bounds.getNorth() / gridSpacing) * gridSpacing;
         
         for (let lat = startLat; lat <= endLat; lat += gridSpacing) {
-          const point = this._map.latLngToLayerPoint([lat, bounds.getCenter().lng]);
+          const startPoint = this._map.latLngToLayerPoint([lat, bounds.getWest()]);
+          const endPoint = this._map.latLngToLayerPoint([lat, bounds.getEast()]);
+          
           ctx.beginPath();
           ctx.strokeStyle = '#e0e0e0';
           ctx.lineWidth = 1;
-          ctx.moveTo(0, point.y);
-          ctx.lineTo(size.x, point.y);
+          ctx.moveTo(startPoint.x, startPoint.y);
+          ctx.lineTo(endPoint.x, endPoint.y);
           ctx.stroke();
         }
       },
@@ -99,7 +107,7 @@ const OfflineMapLayer = () => {
         const gridSpacing = this._getGridSpacing(zoom);
         const fontSize = Math.max(10, Math.min(14, 12 + zoom - 10));
         
-        // Draw longitude labels
+        // Draw longitude labels (vertical)
         const startLng = Math.floor(bounds.getWest() / gridSpacing) * gridSpacing;
         const endLng = Math.ceil(bounds.getEast() / gridSpacing) * gridSpacing;
         
@@ -117,11 +125,12 @@ const OfflineMapLayer = () => {
           label.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
           label.style.padding = '2px 4px';
           label.style.borderRadius = '2px';
+          label.style.zIndex = '2';
           
           this._container.appendChild(label);
         }
 
-        // Draw latitude labels
+        // Draw latitude labels (horizontal)
         const startLat = Math.floor(bounds.getSouth() / gridSpacing) * gridSpacing;
         const endLat = Math.ceil(bounds.getNorth() / gridSpacing) * gridSpacing;
         
@@ -139,6 +148,7 @@ const OfflineMapLayer = () => {
           label.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
           label.style.padding = '2px 4px';
           label.style.borderRadius = '2px';
+          label.style.zIndex = '2';
           
           this._container.appendChild(label);
         }

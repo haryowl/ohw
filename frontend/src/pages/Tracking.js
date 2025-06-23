@@ -42,17 +42,28 @@ const Tracking = () => {
   const [error, setError] = useState('');
   const [mapCenter, setMapCenter] = useState([0, 0]);
   const [mapZoom, setMapZoom] = useState(2);
+  const [debugInfo, setDebugInfo] = useState('');
 
   // Load devices
   useEffect(() => {
     const loadDevices = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/devices`);
+        console.log('Loading devices...');
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/devices`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const devicesData = await response.json();
+        console.log('Devices loaded:', devicesData);
         setDevices(devicesData);
+        setDebugInfo(`Loaded ${devicesData.length} devices`);
       } catch (error) {
         console.error('Error loading devices:', error);
-        setError('Failed to load devices');
+        setError(`Failed to load devices: ${error.message}`);
+        setDebugInfo(`Error: ${error.message}`);
       }
     };
     loadDevices();
@@ -67,23 +78,28 @@ const Tracking = () => {
 
     setLoading(true);
     setError('');
+    setDebugInfo('Loading tracking data...');
 
     try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
       const params = new URLSearchParams({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       });
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/data/${selectedDevice}/tracking?${params}`
-      );
+      const url = `${apiUrl}/api/data/${selectedDevice}/tracking?${params}`;
+      console.log('Fetching tracking data from:', url);
+
+      const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error('Failed to load tracking data');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Tracking data received:', data);
       setTrackingData(data);
+      setDebugInfo(`Loaded ${data.length} tracking points`);
 
       // Set map center to first point or default
       if (data.length > 0) {
@@ -92,7 +108,8 @@ const Tracking = () => {
       }
     } catch (error) {
       console.error('Error loading tracking data:', error);
-      setError('Failed to load tracking data');
+      setError(`Failed to load tracking data: ${error.message}`);
+      setDebugInfo(`Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -110,6 +127,13 @@ const Tracking = () => {
             <Typography variant="h5" gutterBottom>
               Device Tracking
             </Typography>
+            
+            {/* Debug Info */}
+            {debugInfo && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Debug: {debugInfo}
+              </Alert>
+            )}
             
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} md={3}>

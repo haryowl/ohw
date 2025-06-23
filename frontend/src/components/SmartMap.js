@@ -78,7 +78,10 @@ const SmartMap = ({
           />
         )}
         
-        {children}
+        {/* Render children (markers, polylines, etc.) with higher z-index */}
+        <div style={{ position: 'relative', zIndex: 1000 }}>
+          {children}
+        </div>
       </MapContainer>
       
       {/* Offline mode indicator */}
@@ -93,7 +96,7 @@ const SmartMap = ({
           borderRadius: '4px',
           fontSize: '12px',
           fontWeight: 'bold',
-          zIndex: 1000,
+          zIndex: 2000,
           pointerEvents: 'none'
         }}>
           📡 Offline Mode - Grid View
@@ -114,7 +117,7 @@ const SmartMap = ({
           borderRadius: '4px',
           fontSize: '12px',
           cursor: 'pointer',
-          zIndex: 1000
+          zIndex: 2000
         }}
         title="Toggle between online map and offline grid"
       >
