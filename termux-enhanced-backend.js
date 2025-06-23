@@ -986,6 +986,21 @@ function addParsedData(data) {
         
         logger.info(`Added data for device: ${extractedData.deviceId || 'unknown'}`);
         
+        // Broadcast to Socket.IO clients
+        io.emit('deviceData', extractedData);
+        io.emit('deviceUpdate', {
+            deviceId: extractedData.deviceId,
+            timestamp: extractedData.timestamp,
+            location: {
+                latitude: extractedData.latitude,
+                longitude: extractedData.longitude
+            },
+            speed: extractedData.speed,
+            direction: extractedData.direction,
+            voltage: extractedData.voltage,
+            status: extractedData.status
+        });
+        
     } else {
         // Handle other packet types (ignorable, extension, etc.)
         const simpleData = {
@@ -1337,10 +1352,32 @@ function startHTTPServer() {
         serveStaticFile(req, res, filePath);
     });
 
+    // Attach Socket.IO to HTTP server
+    io.attach(httpServer);
+
+    // Socket.IO connection handling
+    io.on('connection', (socket) => {
+        console.log('Socket.IO client connected:', socket.id);
+        
+        // Send current data to new client
+        if (parsedData.length > 0) {
+            socket.emit('deviceData', parsedData[0]);
+        }
+        
+        socket.on('disconnect', () => {
+            console.log('Socket.IO client disconnected:', socket.id);
+        });
+        
+        socket.on('error', (error) => {
+            console.error('Socket.IO error:', error);
+        });
+    });
+
     httpServer.listen(config.httpPort, config.host, () => {
         logger.info(`HTTP server listening on ${config.host}:${config.httpPort}`);
         logger.info(`Frontend available at: http://${config.host}:${config.httpPort}`);
         logger.info(`API available at: http://${config.host}:${config.httpPort}/api/`);
+        logger.info(`Socket.IO available at: http://${config.host}:${config.httpPort}`);
     });
 
     httpServer.on('error', (error) => {

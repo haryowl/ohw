@@ -401,7 +401,7 @@
                     <span id="statusText">Disconnected</span>
                 </div>
                 <div class="controls">
-                    <button class="btn btn-primary" onclick="connectWebSocket()">Connect</button>
+                    <button class="btn btn-primary" onclick="connectSocket()">Connect</button>
                     <button class="btn btn-warning" onclick="clearData()">Clear Data</button>
                     <button class="btn btn-success" onclick="downloadData()">Download CSV</button>
                 </div>
@@ -411,7 +411,7 @@
                 <div style="font-size: 0.8em; color: #666;">
                     <strong>Connection Info:</strong><br>
                     API: <span id="apiUrlDisplay">Loading...</span><br>
-                    WebSocket: <span id="wsUrlDisplay">Loading...</span>
+                    Socket: <span id="socketUrlDisplay">Loading...</span>
                 </div>
             </div>
 
@@ -473,6 +473,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         // Global variables
         let map, trackingMap;
@@ -480,7 +481,7 @@
         let trackingMarkers = [];
         let trackingPolyline;
         let dataRecords = [];
-        let ws = null;
+        let socket = null;
         let isOfflineMode = false;
         let isTrackingOfflineMode = false;
         let devices = [];
@@ -491,9 +492,9 @@
             apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
                 ? 'http://localhost:3001' 
                 : `http://${window.location.hostname}:3001`,
-            wsUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'ws://localhost:3001'
-                : `ws://${window.location.hostname}:3001`,
+            socketUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:3001'
+                : `http://${window.location.hostname}:3001`,
             maxRecords: 1000
         };
 
@@ -877,48 +878,48 @@
             mapInstance.addLayer(gridLayer);
         }
 
-        function connectWebSocket() {
-            if (ws) {
-                ws.close();
+        function connectSocket() {
+            if (socket) {
+                socket.close();
                 return;
             }
 
             try {
-                console.log('Attempting to connect to WebSocket:', config.wsUrl);
+                console.log('Attempting to connect to Socket:', config.socketUrl);
                 console.log('API URL:', config.apiUrl);
                 
-                ws = new WebSocket(config.wsUrl);
+                socket = io(config.socketUrl);
                 
-                ws.onopen = function() {
+                socket.on('connect', function() {
                     updateStatus(true);
-                    console.log('WebSocket connected successfully');
-                };
+                    console.log('Socket connected successfully');
+                });
                 
-                ws.onmessage = function(event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        console.log('Received WebSocket data:', data);
-                        processData(data);
-                    } catch (error) {
-                        console.error('Error parsing WebSocket data:', error);
-                    }
-                };
+                socket.on('deviceData', function(data) {
+                    console.log('Received device data:', data);
+                    processData(data);
+                });
                 
-                ws.onclose = function(event) {
+                socket.on('deviceUpdate', function(data) {
+                    console.log('Received device update:', data);
+                    processData(data);
+                });
+                
+                socket.on('disconnect', function(reason) {
                     updateStatus(false);
-                    console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
-                    ws = null;
-                };
+                    console.log('Socket disconnected. Reason:', reason);
+                    socket = null;
+                });
                 
-                ws.onerror = function(error) {
-                    console.error('WebSocket error:', error);
+                socket.on('connect_error', function(error) {
+                    console.error('Socket connection error:', error);
                     updateStatus(false);
-                    alert('WebSocket connection failed. Check if backend is running and accessible.');
-                };
+                    alert('Socket connection failed. Check if backend is running and accessible.');
+                });
             } catch (error) {
-                console.error('Error connecting to WebSocket:', error);
+                console.error('Error connecting to Socket:', error);
                 updateStatus(false);
-                alert('Failed to create WebSocket connection: ' + error.message);
+                alert('Failed to create Socket connection: ' + error.message);
             }
         }
 
@@ -1086,13 +1087,13 @@
 
         function updateConnectionInfo() {
             document.getElementById('apiUrlDisplay').textContent = config.apiUrl;
-            document.getElementById('wsUrlDisplay').textContent = config.wsUrl;
+            document.getElementById('socketUrlDisplay').textContent = config.socketUrl;
         }
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
-            if (ws) {
-                ws.close();
+            if (socket) {
+                socket.close();
             }
         });
     </script>

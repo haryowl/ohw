@@ -32,13 +32,8 @@ const parser = new GalileoskyParser();
 const wss = new WebSocket.Server({ noServer: true });
 
 // Handle WebSocket upgrade
-app.on('upgrade', (request, socket, head) => {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-    });
-});
-
 wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
     ws.isAlive = true;
     
     ws.on('pong', () => {
@@ -53,6 +48,14 @@ wss.on('connection', (ws) => {
             logger.error('WebSocket message error:', error);
         }
     });
+
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
 });
 
 // Keep alive check
@@ -66,11 +69,21 @@ setInterval(() => {
 
 // Broadcast to WebSocket clients
 function broadcast(topic, data) {
+    console.log(`Broadcasting to ${wss.clients.size} clients:`, topic, data);
     wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ topic, data }));
         }
     });
+}
+
+// Handle WebSocket messages
+function handleWebSocketMessage(ws, data) {
+    console.log('Received WebSocket message:', data);
+    // Handle different message types here
+    if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+    }
 }
 
 // Serve React app if frontend build exists
@@ -132,6 +145,16 @@ async function startServer() {
             throw new Error('Could not start server on any available port');
         }
 
+        // Attach WebSocket server to HTTP server
+        server.on('upgrade', (request, socket, head) => {
+            console.log('WebSocket upgrade request received');
+            wss.handleUpgrade(request, socket, head, (ws) => {
+                wss.emit('connection', ws, request);
+            });
+        });
+
+        console.log(`WebSocket server ready on port ${selectedPort}`);
+
         // Handle graceful shutdown
         process.on('SIGINT', async () => {
             console.log('Shutting down server...');
@@ -158,5 +181,6 @@ module.exports = {
     app,
     httpServer: http.createServer(app),
     tcpServer,
-    wss
+    wss,
+    broadcast
 };
