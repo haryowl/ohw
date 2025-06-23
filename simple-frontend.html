@@ -339,6 +339,114 @@
             font-size: 0.9em;
         }
 
+        .export-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .export-section {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+        }
+
+        .export-section h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1em;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 8px;
+        }
+
+        .control-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .control-row select,
+        .control-row input {
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .parameter-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            background: #f8f9fa;
+        }
+
+        .parameter-item {
+            display: grid;
+            grid-template-columns: 30px 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #e9ecef;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+
+        .parameter-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .parameter-checkbox {
+            width: 16px;
+            height: 16px;
+        }
+
+        .parameter-name {
+            font-weight: 500;
+            color: #495057;
+            font-size: 0.9em;
+        }
+
+        .parameter-rename {
+            padding: 4px 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        .data-preview {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            background: #f8f9fa;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            border: 1px solid #dee2e6;
+            padding: 4px 8px;
+            text-align: left;
+        }
+
+        .preview-table th {
+            background: #e9ecef;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 5px;
@@ -391,6 +499,7 @@
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="showTab('realtime')">Real-time</button>
             <button class="nav-tab" onclick="showTab('tracking')">Tracking History</button>
+            <button class="nav-tab" onclick="showTab('export')">Data Export</button>
         </div>
 
         <!-- Real-time Tab -->
@@ -471,6 +580,43 @@
                 </div>
             </div>
         </div>
+
+        <!-- Data Export Tab -->
+        <div id="export" class="tab-content">
+            <div class="panel">
+                <h3>Custom Data Export</h3>
+                <div class="export-controls">
+                    <div class="export-section">
+                        <h4>Device & Period Selection</h4>
+                        <div class="control-row">
+                            <select id="exportDeviceSelect">
+                                <option value="">Select Device</option>
+                            </select>
+                            <input type="datetime-local" id="exportStartDate" />
+                            <input type="datetime-local" id="exportEndDate" />
+                        </div>
+                    </div>
+                    
+                    <div class="export-section">
+                        <h4>Parameter Selection & Renaming</h4>
+                        <div class="parameter-list" id="parameterList">
+                            <div class="no-data">Select a device and period to load available parameters</div>
+                        </div>
+                    </div>
+                    
+                    <div class="export-section">
+                        <h4>Export Options</h4>
+                        <div class="control-row">
+                            <button class="btn btn-primary" onclick="loadExportData()">Load Data Preview</button>
+                            <button class="btn btn-success" onclick="downloadCustomExport()">Download Custom CSV</button>
+                        </div>
+                        <div class="data-preview" id="dataPreview">
+                            <div class="no-data">No data preview available</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -487,6 +633,10 @@
         let isTrackingOfflineMode = false;
         let devices = [];
         let trackingData = [];
+
+        // Export functionality
+        let exportData = [];
+        let availableParameters = [];
 
         // Configuration
         const config = {
@@ -534,8 +684,13 @@
             const now = new Date();
             const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             
+            // Set defaults for tracking tab
             document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
             document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+            
+            // Set defaults for export tab
+            document.getElementById('exportStartDate').value = yesterday.toISOString().slice(0, 16);
+            document.getElementById('exportEndDate').value = now.toISOString().slice(0, 16);
         }
 
         function showTab(tabName) {
@@ -562,40 +717,31 @@
                 const response = await fetch(`${config.apiUrl}/api/devices`);
                 if (response.ok) {
                     devices = await response.json();
-                    console.log('Loaded devices:', devices);
-                    updateDeviceSelect();
                     
-                    // If no devices, show a message
-                    if (devices.length === 0) {
-                        console.log('No devices found. This is normal if no data has been received yet.');
-                    }
-                } else {
-                    console.error('Failed to load devices:', response.status, response.statusText);
+                    // Update device selects
+                    const deviceSelect = document.getElementById('deviceSelect');
+                    const exportDeviceSelect = document.getElementById('exportDeviceSelect');
+                    
+                    // Clear existing options except the first one
+                    deviceSelect.innerHTML = '<option value="">Select Device</option>';
+                    exportDeviceSelect.innerHTML = '<option value="">Select Device</option>';
+                    
+                    // Add device options
+                    devices.forEach(device => {
+                        const option1 = document.createElement('option');
+                        option1.value = device.imei;
+                        option1.textContent = `${device.name} (${device.imei})`;
+                        deviceSelect.appendChild(option1);
+                        
+                        const option2 = document.createElement('option');
+                        option2.value = device.imei;
+                        option2.textContent = `${device.name} (${device.imei})`;
+                        exportDeviceSelect.appendChild(option2);
+                    });
                 }
             } catch (error) {
                 console.error('Error loading devices:', error);
             }
-        }
-
-        function updateDeviceSelect() {
-            const select = document.getElementById('deviceSelect');
-            select.innerHTML = '<option value="">Select Device</option>';
-            
-            if (devices.length === 0) {
-                const option = document.createElement('option');
-                option.value = "";
-                option.textContent = "No devices available";
-                option.disabled = true;
-                select.appendChild(option);
-                return;
-            }
-            
-            devices.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.imei;
-                option.textContent = device.name || device.imei;
-                select.appendChild(option);
-            });
         }
 
         async function loadTrackingData() {
@@ -1170,6 +1316,185 @@
                 window.URL.revokeObjectURL(url);
             } catch (err) {
                 alert('Download failed: ' + err.message);
+            }
+        }
+
+        // Export functionality
+        async function loadExportData() {
+            const deviceId = document.getElementById('exportDeviceSelect').value;
+            const startDate = document.getElementById('exportStartDate').value;
+            const endDate = document.getElementById('exportEndDate').value;
+            
+            if (!deviceId || !startDate || !endDate) {
+                alert('Please select device and period');
+                return;
+            }
+            
+            try {
+                const params = new URLSearchParams({
+                    startDate: new Date(startDate).toISOString(),
+                    endDate: new Date(endDate).toISOString()
+                });
+                
+                const response = await fetch(`${config.apiUrl}/api/data/${deviceId}/tracking?${params}`);
+                if (!response.ok) throw new Error('Failed to fetch export data');
+                
+                exportData = await response.json();
+                if (!exportData.length) {
+                    alert('No data for selected period');
+                    return;
+                }
+                
+                // Extract available parameters
+                availableParameters = Array.from(new Set(exportData.flatMap(record => Object.keys(record))));
+                availableParameters = availableParameters.filter(param => param !== '__proto__');
+                
+                // Update parameter list
+                updateParameterList();
+                
+                // Show data preview
+                showDataPreview();
+                
+            } catch (err) {
+                alert('Failed to load data: ' + err.message);
+            }
+        }
+
+        function updateParameterList() {
+            const container = document.getElementById('parameterList');
+            
+            if (availableParameters.length === 0) {
+                container.innerHTML = '<div class="no-data">No parameters available</div>';
+                return;
+            }
+            
+            const html = availableParameters.map(param => `
+                <div class="parameter-item">
+                    <input type="checkbox" class="parameter-checkbox" id="param_${param}" checked>
+                    <div class="parameter-name">${param}</div>
+                    <input type="text" class="parameter-rename" value="${param}" placeholder="Custom name">
+                </div>
+            `).join('');
+            
+            container.innerHTML = html;
+        }
+
+        function showDataPreview() {
+            const container = document.getElementById('dataPreview');
+            
+            if (exportData.length === 0) {
+                container.innerHTML = '<div class="no-data">No data available</div>';
+                return;
+            }
+            
+            // Get selected parameters
+            const selectedParams = getSelectedParameters();
+            
+            if (selectedParams.length === 0) {
+                container.innerHTML = '<div class="no-data">No parameters selected</div>';
+                return;
+            }
+            
+            // Show first 5 rows as preview
+            const previewData = exportData.slice(0, 5);
+            
+            const html = `
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            ${selectedParams.map(param => `<th>${param.customName}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${previewData.map(record => `
+                            <tr>
+                                ${selectedParams.map(param => {
+                                    let value = record[param.original];
+                                    if (typeof value === 'object' && value !== null) {
+                                        value = JSON.stringify(value);
+                                    }
+                                    return `<td>${value || ''}</td>`;
+                                }).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
+                    Showing ${previewData.length} of ${exportData.length} records
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        function getSelectedParameters() {
+            const selected = [];
+            
+            availableParameters.forEach(param => {
+                const checkbox = document.getElementById(`param_${param}`);
+                const renameInput = checkbox.nextElementSibling.nextElementSibling;
+                
+                if (checkbox.checked) {
+                    selected.push({
+                        original: param,
+                        customName: renameInput.value || param
+                    });
+                }
+            });
+            
+            return selected;
+        }
+
+        async function downloadCustomExport() {
+            const selectedParams = getSelectedParameters();
+            
+            if (selectedParams.length === 0) {
+                alert('Please select at least one parameter');
+                return;
+            }
+            
+            if (exportData.length === 0) {
+                alert('No data to export. Please load data first.');
+                return;
+            }
+            
+            try {
+                const headers = selectedParams.map(param => param.customName);
+                const csvContent = [
+                    headers.join(','),
+                    ...exportData.map(record =>
+                        selectedParams.map(param => {
+                            let value = record[param.original];
+                            if (typeof value === 'object' && value !== null) {
+                                value = JSON.stringify(value);
+                            }
+                            // Escape quotes and commas
+                            if (typeof value === 'string') {
+                                if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                                    value = '"' + value.replace(/"/g, '""') + '"';
+                                }
+                            }
+                            return value !== undefined ? value : '';
+                        }).join(',')
+                    )
+                ].join('\n');
+                
+                const deviceId = document.getElementById('exportDeviceSelect').value;
+                const startDate = document.getElementById('exportStartDate').value;
+                const endDate = document.getElementById('exportEndDate').value;
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `custom_export_${deviceId}_${startDate.split('T')[0]}_to_${endDate.split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+            } catch (err) {
+                alert('Export failed: ' + err.message);
             }
         }
 
