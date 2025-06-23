@@ -42,7 +42,55 @@ class PacketProcessor {
                 return null;
             }
 
-            // Extract IMEI from parsed packet
+            // Handle multiple records if present
+            if (parsedData.records && parsedData.records.length > 1) {
+                logger.info(`Processing ${parsedData.records.length} records from packet`);
+                
+                const processedRecords = [];
+                
+                for (let i = 0; i < parsedData.records.length; i++) {
+                    const record = parsedData.records[i];
+                    
+                    // Extract IMEI from record
+                    const imei = record.tags['0x03']?.value || parsedData.imei;
+                    if (!imei) {
+                        logger.warn(`No IMEI found in record ${i}`);
+                        continue;
+                    }
+
+                    // Register or get device
+                    let device = await deviceManager.getDevice(imei);
+                    if (!device) {
+                        device = await deviceManager.registerDevice(imei);
+                        logger.info('New device registered:', {
+                            imei,
+                            timestamp: new Date().toISOString()
+                        });
+                    } else {
+                        await deviceManager.updateDeviceStatus(imei, 'online');
+                    }
+
+                    // Process the record
+                    const processed = await this.processMainPacket(record, device.id);
+                    if (processed) {
+                        // Map the data according to device configuration
+                        const mapped = await this.mapPacketData(processed, device.id);
+                        
+                        // Save to database (already done by parser, but ensure it's processed)
+                        await this.saveToDatabase(mapped, device.id);
+                        
+                        // Check for alerts
+                        await this.checkAlerts(device.id, mapped);
+                        
+                        processedRecords.push(mapped);
+                    }
+                }
+                
+                logger.info(`Successfully processed ${processedRecords.length} records`);
+                return processedRecords.length > 0 ? processedRecords[0] : null; // Return first record for compatibility
+            }
+
+            // Single record processing (existing logic)
             const imei = parsedData.imei;
             if (!imei) {
                 logger.error('No IMEI found in packet');
@@ -118,47 +166,102 @@ class PacketProcessor {
                 data: {}
             };
 
+            // Handle both old and new record structures
+            const tags = parsed.tags || parsed;
+            
             // Process each tag
-            for (const [tag, value] of Object.entries(parsed.tags)) {
+            for (const [tag, tagData] of Object.entries(tags)) {
+                const value = tagData.value !== undefined ? tagData.value : tagData;
+                
                 switch (tag) {
-                    case '0x01': // IMEI
+                    case '0x03': // IMEI
                         result.data.imei = value;
+                        result.data.deviceId = value;
                         break;
-                    case '0x02': // Coordinates
-                        result.data.coordinates = value;
+                    case '0x30': // Coordinates
+                        if (value && typeof value === 'object' && value.latitude && value.longitude) {
+                            result.data.latitude = value.latitude;
+                            result.data.longitude = value.longitude;
+                            result.data.satellites = value.satellites;
+                            result.data.coordinateCorrectness = value.correctness;
+                        }
                         break;
-                    case '0x03': // Speed
-                        result.data.speed = value;
+                    case '0x33': // Speed and Direction
+                        if (value && typeof value === 'object') {
+                            result.data.speed = value.speed;
+                            result.data.direction = value.direction;
+                        }
                         break;
-                    case '0x04': // Course
-                        result.data.course = value;
+                    case '0x34': // Height
+                        result.data.height = value;
                         break;
-                    case '0x05': // Altitude
-                        result.data.altitude = value;
-                        break;
-                    case '0x06': // Satellites
-                        result.data.satellites = value;
-                        break;
-                    case '0x07': // HDOP
+                    case '0x35': // HDOP
                         result.data.hdop = value;
                         break;
-                    case '0x08': // Inputs
-                        result.data.inputs = value;
+                    case '0x40': // Status
+                        result.data.status = value;
                         break;
-                    case '0x09': // Outputs
-                        result.data.outputs = value;
+                    case '0x41': // Supply Voltage
+                        result.data.supplyVoltage = value;
                         break;
-                    case '0x0A': // ADC
-                        result.data.adc = value;
+                    case '0x42': // Battery Voltage
+                        result.data.batteryVoltage = value;
                         break;
-                    case '0x0B': // iButton
-                        result.data.ibutton = value;
-                        break;
-                    case '0x0C': // Temperature
+                    case '0x43': // Temperature
                         result.data.temperature = value;
                         break;
+                    case '0x44': // Acceleration
+                        result.data.acceleration = value;
+                        break;
+                    case '0x45': // Outputs
+                        result.data.outputs = value;
+                        break;
+                    case '0x46': // Inputs
+                        result.data.inputs = value;
+                        break;
+                    case '0x47': // ECO Driving
+                        result.data.ecoDriving = value;
+                        break;
+                    case '0x48': // Expanded Status
+                        result.data.expandedStatus = value;
+                        break;
+                    case '0x49': // Transmission Channel
+                        result.data.transmissionChannel = value;
+                        break;
+                    case '0x50': // Input Voltage 0
+                        result.data.inputVoltage0 = value;
+                        break;
+                    case '0x51': // Input Voltage 1
+                        result.data.inputVoltage1 = value;
+                        break;
+                    case '0x52': // Input Voltage 2
+                        result.data.inputVoltage2 = value;
+                        break;
+                    case '0x53': // Input Voltage 3
+                        result.data.inputVoltage3 = value;
+                        break;
+                    case '0x20': // Date Time
+                        result.data.timestamp = value;
+                        break;
+                    case '0x21': // Milliseconds
+                        result.data.milliseconds = value;
+                        break;
+                    case '0x10': // Archive Record Number
+                        result.data.recordNumber = value;
+                        break;
+                    case '0xe2': // User Data 0
+                        result.data.userData0 = value;
+                        break;
+                    case '0x0001': // Modbus 0
+                        result.data.modbus0 = value;
+                        break;
+                    case '0x0002': // Modbus 1
+                        result.data.modbus1 = value;
+                        break;
                     default:
-                        logger.warn(`Unknown tag: ${tag}`);
+                        // Store unknown tags with their original names
+                        result.data[tag] = value;
+                        logger.debug(`Processed unknown tag: ${tag} = ${value}`);
                 }
             }
 
@@ -373,11 +476,11 @@ class PacketProcessor {
 
     logDeviceParameters(tags, imei) {
         const parameters = {
-            imei: tags['0x03'] || tags['3'],
-            coordinates: tags['0x30'],
-            timestamp: tags['0x20'],
-            supplyVoltage: tags['0x41'],
-            batteryVoltage: tags['0x42']
+            imei: tags['0x03']?.value || tags['0x03'],
+            coordinates: tags['0x30']?.value || tags['0x30'],
+            timestamp: tags['0x20']?.value || tags['0x20'],
+            supplyVoltage: tags['0x41']?.value || tags['0x41'],
+            batteryVoltage: tags['0x42']?.value || tags['0x42']
         };
 
         logger.info('Device Parameters:', {
