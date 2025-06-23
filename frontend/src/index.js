@@ -8,7 +8,7 @@ root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-);
+); 
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {

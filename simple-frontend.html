@@ -612,6 +612,9 @@
                 <span id="statusText">Disconnected</span>
             </div>
             <div class="controls">
+                <select id="deviceSelect" class="form-control" style="min-width:120px;max-width:180px;" onchange="onDeviceChange()">
+                  <option value="">All Devices</option>
+                </select>
                 <button class="btn btn-primary" onclick="openDownloadModal()">📥 Download Data</button>
                 <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
                 <a href="/api/health" class="btn btn-success" target="_blank">🔧 API Health</a>
@@ -792,6 +795,8 @@
         let lastData = null;
         let devices = new Set();
         let packetCount = 0;
+        let selectedDeviceId = '';
+        let offlineMode = false;
 
         // Initialize the application
         function init() {
@@ -803,18 +808,23 @@
         // Load OpenStreetMap
         function loadMap() {
             const mapDiv = document.getElementById('map');
-            mapDiv.innerHTML = `
-                <iframe 
-                    width="100%" 
-                    height="400" 
-                    frameborder="0" 
-                    scrolling="no" 
-                    marginheight="0" 
-                    marginwidth="0" 
-                    src="https://www.openstreetmap.org/export/embed.html?bbox=-180,-90,180,90&layer=mapnik&marker=0,0"
-                    style="border: 1px solid #ccc; border-radius: 8px;">
-                </iframe>
-            `;
+            if (offlineMode || !navigator.onLine) {
+                mapDiv.innerHTML = `<canvas id="gridMap" width="100%" height="300"></canvas><div style="text-align:center;color:#888;">Offline Grid Map</div>`;
+                drawGridMap();
+            } else {
+                mapDiv.innerHTML = `
+                    <iframe 
+                        width="100%" 
+                        height="400" 
+                        frameborder="0" 
+                        scrolling="no" 
+                        marginheight="0" 
+                        marginwidth="0" 
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=-180,-90,180,90&layer=mapnik&marker=0,0"
+                        style="border: 1px solid #ccc; border-radius: 8px;">
+                    </iframe>
+                `;
+            }
         }
 
         // Start polling for data
@@ -843,47 +853,38 @@
         // Update the UI with new data
         function updateUI(data) {
             if (!data || !data.length) return;
-
-            // Get the most recent packet with actual data (not just IMEI)
-            let latestPacket = data[0]; // Start with the first (most recent) packet
+            // Filter by selected device
+            let filtered = selectedDeviceId ? data.filter(d => d.deviceId === selectedDeviceId) : data;
+            if (!filtered.length) filtered = [data[0]];
             
-            // Look for a packet with actual coordinates or other meaningful data
-            for (let i = 0; i < data.length; i++) {
-                const packet = data[i];
-                if (packet.latitude !== null && packet.longitude !== null) {
-                    latestPacket = packet;
-                    break;
-                }
-            }
-            
-            lastData = latestPacket;
+            lastData = filtered[0];
             
             // Debug logging
             console.log('Frontend received data:', {
-                packetCount: data.length,
-                selectedPacketIndex: data.indexOf(latestPacket),
+                packetCount: filtered.length,
+                selectedPacketIndex: filtered.indexOf(lastData),
                 latestPacket: {
-                    deviceId: latestPacket.deviceId,
-                    imei: latestPacket.imei,
-                    latitude: latestPacket.latitude,
-                    longitude: latestPacket.longitude,
-                    speed: latestPacket.speed,
-                    direction: latestPacket.direction,
-                    height: latestPacket.height,
-                    satellites: latestPacket.satellites,
-                    supplyVoltage: latestPacket.supplyVoltage,
-                    batteryVoltage: latestPacket.batteryVoltage,
-                    temperature: latestPacket.temperature,
-                    status: latestPacket.status,
-                    hasTags: !!latestPacket.tags,
-                    tagCount: latestPacket.tags ? Object.keys(latestPacket.tags).length : 0
+                    deviceId: lastData.deviceId,
+                    imei: lastData.imei,
+                    latitude: lastData.latitude,
+                    longitude: lastData.longitude,
+                    speed: lastData.speed,
+                    direction: lastData.direction,
+                    height: lastData.height,
+                    satellites: lastData.satellites,
+                    supplyVoltage: lastData.supplyVoltage,
+                    batteryVoltage: lastData.batteryVoltage,
+                    temperature: lastData.temperature,
+                    status: lastData.status,
+                    hasTags: !!lastData.tags,
+                    tagCount: lastData.tags ? Object.keys(lastData.tags).length : 0
                 }
             });
             
             // Update statistics
-            packetCount = data.length;
+            packetCount = filtered.length;
             devices.clear();
-            data.forEach(packet => {
+            filtered.forEach(packet => {
                 if (packet.deviceId) devices.add(packet.deviceId);
             });
 
@@ -892,29 +893,32 @@
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
 
             // Update location data
-            if (latestPacket.latitude && latestPacket.longitude) {
+            if (lastData.latitude && lastData.longitude) {
                 document.getElementById('coordinates').textContent = 
-                    `${latestPacket.latitude.toFixed(6)}, ${latestPacket.longitude.toFixed(6)}`;
-                updateMap(latestPacket.latitude, latestPacket.longitude);
+                    `${lastData.latitude.toFixed(6)}, ${lastData.longitude.toFixed(6)}`;
+                updateMap(lastData.latitude, lastData.longitude);
             }
 
             // Update device info
-            document.getElementById('deviceId').textContent = latestPacket.deviceId || 'Unknown';
-            document.getElementById('speed').textContent = latestPacket.speed ? `${latestPacket.speed.toFixed(1)} km/h` : 'No data';
-            document.getElementById('direction').textContent = latestPacket.direction ? `${latestPacket.direction}°` : 'No data';
-            document.getElementById('height').textContent = latestPacket.height ? `${latestPacket.height}m` : 'No data';
-            document.getElementById('satellites').textContent = latestPacket.satellites || 'No data';
+            document.getElementById('deviceId').textContent = lastData.deviceId || 'Unknown';
+            document.getElementById('speed').textContent = lastData.speed ? `${lastData.speed.toFixed(1)} km/h` : 'No data';
+            document.getElementById('direction').textContent = lastData.direction ? `${lastData.direction}°` : 'No data';
+            document.getElementById('height').textContent = lastData.height ? `${lastData.height}m` : 'No data';
+            document.getElementById('satellites').textContent = lastData.satellites || 'No data';
 
             // Update device status
-            document.getElementById('supplyVoltage').textContent = latestPacket.supplyVoltage ? `${latestPacket.supplyVoltage}mV` : 'No data';
-            document.getElementById('batteryVoltage').textContent = latestPacket.batteryVoltage ? `${latestPacket.batteryVoltage}mV` : 'No data';
-            document.getElementById('temperature').textContent = latestPacket.temperature ? `${latestPacket.temperature}°C` : 'No data';
-            document.getElementById('status').textContent = latestPacket.status || 'No data';
-            document.getElementById('packetType').textContent = latestPacket.packetType || 'No data';
-            document.getElementById('imei').textContent = latestPacket.imei || 'No data';
+            document.getElementById('supplyVoltage').textContent = lastData.supplyVoltage ? `${lastData.supplyVoltage}mV` : 'No data';
+            document.getElementById('batteryVoltage').textContent = lastData.batteryVoltage ? `${lastData.batteryVoltage}mV` : 'No data';
+            document.getElementById('temperature').textContent = lastData.temperature ? `${lastData.temperature}°C` : 'No data';
+            document.getElementById('status').textContent = lastData.status || 'No data';
+            document.getElementById('packetType').textContent = lastData.packetType || 'No data';
+            document.getElementById('imei').textContent = lastData.imei || 'No data';
 
             // Update all parameters
-            updateParameters(latestPacket);
+            updateParameters(lastData);
+
+            // Update device dropdown
+            updateDeviceDropdown(Array.from(devices));
         }
 
         // Update parameters display
@@ -1297,6 +1301,61 @@
             });
             localStorage.setItem('foldableSections', JSON.stringify(state));
         }
+
+        // --- Device selection logic ---
+        function onDeviceChange() {
+            selectedDeviceId = document.getElementById('deviceSelect').value;
+            pollData(); // Refresh data for selected device
+        }
+
+        // --- Update device dropdown and filter data ---
+        function updateDeviceDropdown(deviceList) {
+            const select = document.getElementById('deviceSelect');
+            const current = select.value;
+            select.innerHTML = '<option value="">All Devices</option>';
+            deviceList.forEach(deviceId => {
+                const opt = document.createElement('option');
+                opt.value = deviceId;
+                opt.textContent = deviceId;
+                select.appendChild(opt);
+            });
+            select.value = current;
+        }
+
+        // --- Offline grid map toggle ---
+        function toggleOfflineMap() {
+            offlineMode = !offlineMode;
+            loadMap();
+        }
+
+        // --- Draw simple grid map ---
+        function drawGridMap() {
+            const canvas = document.getElementById('gridMap');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width = canvas.offsetWidth;
+            const h = canvas.height = canvas.offsetHeight;
+            ctx.clearRect(0,0,w,h);
+            ctx.strokeStyle = '#ccc';
+            for (let i = 0; i < w; i += w/10) ctx.strokeRect(i,0,1,h);
+            for (let j = 0; j < h; j += h/10) ctx.strokeRect(0,j,w,1);
+            ctx.fillStyle = '#888';
+            ctx.font = '12px monospace';
+            ctx.fillText('No map tiles (offline)', 10, 20);
+        }
+
+        // --- Add toggle button to map section ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const mapContent = document.getElementById('map-content');
+            if (mapContent) {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary';
+                btn.style.marginBottom = '10px';
+                btn.textContent = 'Toggle Grid/Map';
+                btn.onclick = toggleOfflineMap;
+                mapContent.insertBefore(btn, mapContent.firstChild);
+            }
+        });
     </script>
 </body>
 </html> 
