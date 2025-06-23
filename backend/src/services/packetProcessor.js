@@ -7,8 +7,7 @@ const { DataPoint, Record } = require('../models');
 const deviceManager = require('./deviceManager');
 const deviceMapper = require('./deviceMapper');
 const alertManager = require('./alertManager');
-const parser = require('./parser');
-const { parsePacket } = require('./parser');
+const GalileoskyParser = require('./parser');
 
 class PacketProcessor {
     constructor() {
@@ -35,8 +34,8 @@ class PacketProcessor {
             // Log to CSV
             csvLogger.logDeviceData(packet.toString('hex'));
 
-            // Parse the packet first
-            const parsedData = parsePacket(packet);
+            // Parse the packet first using the new parseSinglePacket function
+            const parsedData = await this.parser.parseSinglePacket(packet);
             if (!parsedData) {
                 logger.error('Failed to parse packet');
                 return null;
