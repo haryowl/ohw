@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galileosky Parser - Real-time Tracking</title>
+    <title>Galileosky Parser - Mobile Tracking</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
             margin: 0;
@@ -15,7 +16,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
 
         .container {
@@ -30,12 +31,12 @@
         .header {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: white;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 1.5em;
+            font-size: 1.3em;
             margin-bottom: 5px;
             font-weight: 300;
         }
@@ -45,9 +46,49 @@
             font-size: 0.8em;
         }
 
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .nav-tab.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .nav-tab:hover {
+            background: #e9ecef;
+        }
+
+        .nav-tab.active:hover {
+            background: #0056b3;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 15px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .status-bar {
             background: #f8f9fa;
-            padding: 10px 20px;
+            padding: 10px 15px;
             border-bottom: 1px solid #e9ecef;
             display: flex;
             justify-content: space-between;
@@ -134,106 +175,12 @@
             transform: translateY(-2px);
         }
 
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-                gap: 15px;
-                padding: 15px;
-            }
-            
-            .header {
-                padding: 15px;
-            }
-            
-            .header h1 {
-                font-size: 1.3em;
-            }
-            
-            .header p {
-                font-size: 0.75em;
-            }
-            
-            .status-bar {
-                padding: 8px 15px;
-                gap: 8px;
-            }
-            
-            .status-indicator {
-                font-size: 0.8em;
-            }
-            
-            .btn {
-                padding: 5px 10px;
-                font-size: 0.75em;
-            }
-            
-            .panel {
-                padding: 12px;
-            }
-            
-            .panel h3 {
-                font-size: 1em;
-                margin-bottom: 12px;
-            }
-            
-            .data-item {
-                padding: 8px;
-            }
-            
-            .data-label {
-                font-size: 0.7em;
-            }
-            
-            .data-value {
-                font-size: 0.9em;
-            }
-            
-            .stat-value {
-                font-size: 1.2em;
-            }
-            
-            .stat-label {
-                font-size: 0.7em;
-            }
-            
-            .parameters-grid {
-                grid-template-columns: 1fr;
-                gap: 8px;
-            }
-            
-            .parameter-item {
-                padding: 8px;
-            }
-            
-            .parameter-name {
-                font-size: 0.75em;
-            }
-            
-            .parameter-value {
-                font-size: 0.85em;
-            }
-            
-            .parameter-description {
-                font-size: 0.65em;
-            }
-            
-            #map {
-                height: 250px;
-            }
-        }
-
         .panel {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 15px;
             border: 1px solid #e9ecef;
+            margin-bottom: 15px;
         }
 
         .panel h3 {
@@ -242,6 +189,118 @@
             font-size: 1.1em;
             border-bottom: 2px solid #007bff;
             padding-bottom: 8px;
+        }
+
+        .tracking-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tracking-controls select,
+        .tracking-controls input {
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .map-container {
+            position: relative;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 15px;
+        }
+
+        .map-container h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+
+        #map, #trackingMap {
+            width: 100%;
+            height: 400px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+
+        .map-controls button {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+
+        .offline-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 193, 7, 0.9);
+            color: #000;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .track-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .track-summary {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #2196f3;
+        }
+
+        .track-points {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .track-point {
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border-left: 3px solid #4caf50;
+            font-size: 0.85em;
+        }
+
+        .track-point .time {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .track-point .coordinates {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
         }
 
         .data-grid {
@@ -272,82 +331,6 @@
             font-weight: 500;
         }
 
-        .data-value.coordinates {
-            font-family: 'Courier New', monospace;
-            background: #f8f9fa;
-            padding: 3px 8px;
-            border-radius: 3px;
-            border: 1px solid #dee2e6;
-            font-size: 0.85em;
-        }
-
-        .map-container {
-            grid-column: 1 / -1;
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #e9ecef;
-        }
-
-        .map-container h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 8px;
-        }
-
-        #map {
-            width: 100%;
-            height: 300px;
-            border-radius: 6px;
-            border: 1px solid #dee2e6;
-        }
-
-        .parameters-panel {
-            grid-column: 1 / -1;
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #e9ecef;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .parameters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 10px;
-        }
-
-        .parameter-item {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 3px solid #28a745;
-        }
-
-        .parameter-name {
-            font-weight: 600;
-            color: #495057;
-            margin-bottom: 3px;
-            font-size: 0.8em;
-        }
-
-        .parameter-value {
-            font-size: 0.9em;
-            color: #2c3e50;
-            font-weight: 500;
-            word-break: break-all;
-        }
-
-        .parameter-description {
-            font-size: 0.7em;
-            color: #6c757d;
-            margin-top: 3px;
-            font-style: italic;
-        }
-
         .no-data {
             text-align: center;
             color: #6c757d;
@@ -356,658 +339,570 @@
             font-size: 0.9em;
         }
 
-        .loading {
-            text-align: center;
-            color: #007bff;
-            padding: 15px;
-            font-size: 0.9em;
-        }
-
-        .spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #007bff;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 8px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .stats {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
-        }
-
-        .stat-item {
-            background: white;
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
-            min-width: 100px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .stat-value {
-            font-size: 1.4em;
-            font-weight: bold;
-            color: #007bff;
-        }
-
-        .stat-label {
-            font-size: 0.75em;
-            color: #6c757d;
-            margin-top: 3px;
-        }
-
-        /* LED Status Indicators */
-        .led-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 5px;
-        }
-
-        .led-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.75em;
-        }
-
-        .led {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            box-shadow: 0 0 5px rgba(0,0,0,0.2);
-            transition: all 0.3s ease;
-        }
-
-        .led.on {
-            background: #28a745;
-            box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
-        }
-
-        .led.off {
-            background: #dc3545;
-            box-shadow: 0 0 5px rgba(220, 53, 69, 0.3);
-        }
-
-        .led-label {
-            font-size: 0.7em;
-            color: #495057;
-            font-weight: 500;
-        }
-
-        /* Download Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .modal-title {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .close {
-            color: #aaa;
-            font-size: 1.5em;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close:hover {
-            color: #000;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #495057;
-            font-size: 0.9em;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #545b62;
-        }
-
-        /* Foldable Sections */
-        .foldable-section {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            overflow: hidden;
-        }
-
-        .foldable-header {
-            background: #f8f9fa;
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #e9ecef;
-            transition: background-color 0.3s ease;
-        }
-
-        .foldable-header:hover {
-            background: #e9ecef;
-        }
-
-        .foldable-title {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #2c3e50;
-            margin: 0;
-        }
-
-        .foldable-icon {
-            font-size: 1.2em;
-            transition: transform 0.3s ease;
-            color: #6c757d;
-        }
-
-        .foldable-icon.collapsed {
-            transform: rotate(-90deg);
-        }
-
-        .foldable-content {
-            background: white;
-            padding: 15px;
-            max-height: 1000px;
-            overflow: hidden;
-            transition: max-height 0.3s ease, padding 0.3s ease;
-        }
-
-        .foldable-content.collapsed {
-            max-height: 0;
-            padding-top: 0;
-            padding-bottom: 0;
-        }
-
-        /* Map container specific styling */
-        .map-container.foldable-section {
-            grid-column: 1 / -1;
-        }
-
-        .map-container .foldable-content {
-            padding: 15px;
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .header {
+                padding: 12px;
+            }
+            
+            .header h1 {
+                font-size: 1.2em;
+            }
+            
+            .nav-tab {
+                padding: 10px 8px;
+                font-size: 0.85em;
+            }
+            
+            .tracking-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .track-info {
+                grid-template-columns: 1fr;
+            }
+            
+            #map, #trackingMap {
+                height: 300px;
+            }
+            
+            .map-controls {
+                top: 15px;
+                left: 15px;
+            }
+            
+            .offline-indicator {
+                top: 15px;
+                right: 15px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📱 Mobile Parser</h1>
-            <p>Real-time IoT Device Tracking</p>
+            <h1>Galileosky Parser</h1>
+            <p>Mobile Tracking & Real-time Monitoring</p>
         </div>
 
-        <div class="status-bar">
-            <div class="status-indicator">
-                <div id="statusDot" class="status-dot disconnected"></div>
-                <span id="statusText">Disconnected</span>
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('realtime')">Real-time</button>
+            <button class="nav-tab" onclick="showTab('tracking')">Tracking History</button>
+        </div>
+
+        <!-- Real-time Tab -->
+        <div id="realtime" class="tab-content active">
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <div class="status-dot disconnected" id="statusDot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="connectWebSocket()">Connect</button>
+                    <button class="btn btn-warning" onclick="clearData()">Clear Data</button>
+                    <button class="btn btn-success" onclick="downloadData()">Download CSV</button>
+                </div>
             </div>
-            <div class="controls">
-                <select id="deviceSelect" class="form-control" style="min-width:120px;max-width:180px;" onchange="onDeviceChange()">
-                  <option value="">All Devices</option>
-                </select>
-                <button class="btn btn-primary" onclick="openDownloadModal()">📥 Download Data</button>
-                <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
-                <a href="/api/health" class="btn btn-success" target="_blank">🔧 API Health</a>
+
+            <div class="panel">
+                <h3>Current Data</h3>
+                <div id="currentData" class="data-grid">
+                    <div class="no-data">No data available. Connect to start receiving data.</div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <h3>Device Locations</h3>
+                <div id="map"></div>
+                <div class="map-controls">
+                    <button onclick="toggleOfflineMode()">📐 Grid</button>
+                </div>
+                <div class="offline-indicator" id="offlineIndicator" style="display: none;">
+                    📡 Offline Mode - Grid View
+                </div>
             </div>
         </div>
 
-        <div class="main-content">
-            <!-- Live Statistics -->
-            <div class="foldable-section">
-                <div class="foldable-header" onclick="toggleSection('stats')">
-                    <h3 class="foldable-title">📊 Live Statistics</h3>
-                    <span class="foldable-icon" id="stats-icon">▼</span>
-                </div>
-                <div class="foldable-content" id="stats-content">
-                    <div class="stats">
-                        <div class="stat-item">
-                            <div id="packetCount" class="stat-value">0</div>
-                            <div class="stat-label">Packets Received</div>
-                        </div>
-                        <div class="stat-item">
-                            <div id="deviceCount" class="stat-value">0</div>
-                            <div class="stat-label">Devices</div>
-                        </div>
-                        <div class="stat-item">
-                            <div id="lastUpdate" class="stat-value">--</div>
-                            <div class="stat-label">Last Update</div>
-                        </div>
-                    </div>
+        <!-- Tracking History Tab -->
+        <div id="tracking" class="tab-content">
+            <div class="panel">
+                <h3>Track Device</h3>
+                <div class="tracking-controls">
+                    <select id="deviceSelect">
+                        <option value="">Select Device</option>
+                    </select>
+                    <input type="datetime-local" id="startDate" />
+                    <input type="datetime-local" id="endDate" />
+                    <button class="btn btn-primary" onclick="loadTrackingData()">Load Track</button>
                 </div>
             </div>
 
-            <!-- Live Map (moved up) -->
-            <div class="map-container foldable-section">
-                <div class="foldable-header" onclick="toggleSection('map')">
-                    <h3 class="foldable-title">🗺️ Live Map</h3>
-                    <span class="foldable-icon" id="map-icon">▼</span>
+            <div class="map-container">
+                <h3>Track Map</h3>
+                <div id="trackingMap"></div>
+                <div class="map-controls">
+                    <button onclick="toggleTrackingOfflineMode()">📐 Grid</button>
                 </div>
-                <div class="foldable-content" id="map-content">
-                    <div id="map">
-                        <div class="loading">
-                            <div class="spinner"></div>
-                            Loading map...
-                        </div>
-                    </div>
+                <div class="offline-indicator" id="trackingOfflineIndicator" style="display: none;">
+                    📡 Offline Mode - Grid View
                 </div>
             </div>
 
-            <!-- Current Location -->
-            <div class="foldable-section">
-                <div class="foldable-header" onclick="toggleSection('location')">
-                    <h3 class="foldable-title">📍 Current Location</h3>
-                    <span class="foldable-icon" id="location-icon">▼</span>
+            <div class="track-info">
+                <div class="track-summary" id="trackSummary">
+                    <h4>Track Summary</h4>
+                    <div class="no-data">No track data available</div>
                 </div>
-                <div class="foldable-content" id="location-content">
-                    <div class="data-grid">
-                        <div class="data-item">
-                            <div class="data-label">Device ID</div>
-                            <div id="deviceId" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Coordinates</div>
-                            <div id="coordinates" class="data-value coordinates">No GPS data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Speed</div>
-                            <div id="speed" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Direction</div>
-                            <div id="direction" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Height</div>
-                            <div id="height" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Satellites</div>
-                            <div id="satellites" class="data-value">No data</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Device Status -->
-            <div class="foldable-section">
-                <div class="foldable-header" onclick="toggleSection('status')">
-                    <h3 class="foldable-title">🔋 Device Status</h3>
-                    <span class="foldable-icon" id="status-icon">▼</span>
-                </div>
-                <div class="foldable-content" id="status-content">
-                    <div class="data-grid">
-                        <div class="data-item">
-                            <div class="data-label">Supply Voltage</div>
-                            <div id="supplyVoltage" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Battery Voltage</div>
-                            <div id="batteryVoltage" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Temperature</div>
-                            <div id="temperature" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Status</div>
-                            <div id="status" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">Packet Type</div>
-                            <div id="packetType" class="data-value">No data</div>
-                        </div>
-                        <div class="data-item">
-                            <div class="data-label">IMEI</div>
-                            <div id="imei" class="data-value">No data</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- All Parameters -->
-            <div class="foldable-section">
-                <div class="foldable-header" onclick="toggleSection('parameters')">
-                    <h3 class="foldable-title">📋 All Parameters</h3>
-                    <span class="foldable-icon" id="parameters-icon">▼</span>
-                </div>
-                <div class="foldable-content" id="parameters-content">
-                    <div id="parametersContainer">
-                        <div class="no-data">No parameters received yet</div>
-                    </div>
+                <div class="track-points" id="trackPoints">
+                    <h4>Recent Points</h4>
+                    <div class="no-data">No track points available</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Download Modal -->
-    <div id="downloadModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">📥 Download Data</span>
-                <span class="close" onclick="closeDownloadModal()">&times;</span>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Time Period:</label>
-                <select id="timePeriod" class="form-control">
-                    <option value="all">All Data</option>
-                    <option value="1h">Last 1 Hour</option>
-                    <option value="6h">Last 6 Hours</option>
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                    <option value="30d">Last 30 Days</option>
-                    <option value="custom">Custom Range</option>
-                </select>
-            </div>
-            <div id="customRange" class="form-group" style="display: none;">
-                <label class="form-label">Start Date & Time:</label>
-                <input type="datetime-local" id="startDate" class="form-control">
-                <label class="form-label">End Date & Time:</label>
-                <input type="datetime-local" id="endDate" class="form-control">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Format:</label>
-                <select id="downloadFormat" class="form-control">
-                    <option value="json">JSON</option>
-                    <option value="csv">CSV</option>
-                    <option value="xlsx">Excel (XLSX)</option>
-                </select>
-            </div>
-            <div class="btn-group">
-                <button class="btn btn-primary" onclick="downloadData()">📥 Download</button>
-                <button class="btn btn-secondary" onclick="closeDownloadModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map;
-        let currentMarker;
-        let lastData = null;
-        let devices = new Set();
-        let packetCount = 0;
-        let selectedDeviceId = '';
-        let offlineMode = false;
+        // Global variables
+        let map, trackingMap;
+        let markers = new Map();
+        let trackingMarkers = [];
+        let trackingPolyline;
+        let dataRecords = [];
+        let ws = null;
+        let isOfflineMode = false;
+        let isTrackingOfflineMode = false;
+        let devices = [];
+        let trackingData = [];
 
-        // Initialize the application
+        // Configuration
+        const config = {
+            apiUrl: 'http://192.168.1.114:3001',
+            wsUrl: 'ws://192.168.1.114:3001',
+            maxRecords: 1000
+        };
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+
         function init() {
-            loadMap();
-            startPolling();
-            initializeFoldableSections();
+            initializeMaps();
+            loadDevices();
+            setupDateTimeDefaults();
         }
 
-        // Load OpenStreetMap
-        function loadMap() {
-            const mapDiv = document.getElementById('map');
-            if (offlineMode || !navigator.onLine) {
-                mapDiv.innerHTML = `<canvas id="gridMap" width="100%" height="300"></canvas><div style="text-align:center;color:#888;">Offline Grid Map</div>`;
-                drawGridMap();
-            } else {
-                mapDiv.innerHTML = `
-                    <iframe 
-                        width="100%" 
-                        height="400" 
-                        frameborder="0" 
-                        scrolling="no" 
-                        marginheight="0" 
-                        marginwidth="0" 
-                        src="https://www.openstreetmap.org/export/embed.html?bbox=-180,-90,180,90&layer=mapnik&marker=0,0"
-                        style="border: 1px solid #ccc; border-radius: 8px;">
-                    </iframe>
-                `;
+        function initializeMaps() {
+            // Initialize real-time map
+            map = L.map('map').setView([0, 0], 2);
+            
+            // Initialize tracking map
+            trackingMap = L.map('trackingMap').setView([0, 0], 2);
+            
+            // Add default tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(trackingMap);
+        }
+
+        function setupDateTimeDefaults() {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            
+            document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
+            document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Refresh map if needed
+            if (tabName === 'tracking' && trackingMap) {
+                setTimeout(() => trackingMap.invalidateSize(), 100);
             }
         }
 
-        // Start polling for data
-        function startPolling() {
-            pollData();
-            setInterval(pollData, 2000); // Poll every 2 seconds
-        }
-
-        // Poll data from the API
-        async function pollData() {
+        async function loadDevices() {
             try {
-                const response = await fetch('/api/data/latest');
+                const response = await fetch(`${config.apiUrl}/api/devices`);
                 if (response.ok) {
-                    const data = await response.json();
-                    updateUI(data);
-                    updateStatus(true);
-                } else {
-                    updateStatus(false);
+                    devices = await response.json();
+                    updateDeviceSelect();
                 }
             } catch (error) {
-                console.error('Error polling data:', error);
+                console.error('Error loading devices:', error);
+            }
+        }
+
+        function updateDeviceSelect() {
+            const select = document.getElementById('deviceSelect');
+            select.innerHTML = '<option value="">Select Device</option>';
+            
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.imei;
+                option.textContent = device.name || device.imei;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadTrackingData() {
+            const deviceId = document.getElementById('deviceSelect').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!deviceId) {
+                alert('Please select a device');
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    startDate: new Date(startDate).toISOString(),
+                    endDate: new Date(endDate).toISOString()
+                });
+
+                const response = await fetch(`${config.apiUrl}/api/data/${deviceId}/tracking?${params}`);
+                if (response.ok) {
+                    trackingData = await response.json();
+                    displayTrackingData();
+                } else {
+                    alert('Failed to load tracking data');
+                }
+            } catch (error) {
+                console.error('Error loading tracking data:', error);
+                alert('Error loading tracking data');
+            }
+        }
+
+        function displayTrackingData() {
+            // Clear previous tracking data
+            trackingMarkers.forEach(marker => trackingMap.removeLayer(marker));
+            trackingMarkers = [];
+            if (trackingPolyline) {
+                trackingMap.removeLayer(trackingPolyline);
+            }
+
+            if (trackingData.length === 0) {
+                document.getElementById('trackSummary').innerHTML = '<h4>Track Summary</h4><div class="no-data">No tracking data available</div>';
+                document.getElementById('trackPoints').innerHTML = '<h4>Recent Points</h4><div class="no-data">No track points available</div>';
+                return;
+            }
+
+            // Create polyline coordinates
+            const coordinates = trackingData.map(point => [point.latitude, point.longitude]);
+            
+            // Add polyline to map
+            trackingPolyline = L.polyline(coordinates, {
+                color: 'blue',
+                weight: 3,
+                opacity: 0.7
+            }).addTo(trackingMap);
+
+            // Add markers
+            if (trackingData.length > 0) {
+                // Start marker
+                const startMarker = L.marker([trackingData[0].latitude, trackingData[0].longitude], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: '<div style="background-color: #28a745; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>',
+                        iconSize: [12, 12]
+                    })
+                }).addTo(trackingMap);
+                trackingMarkers.push(startMarker);
+
+                // End marker (if different from start)
+                if (trackingData.length > 1) {
+                    const endMarker = L.marker([trackingData[trackingData.length - 1].latitude, trackingData[trackingData.length - 1].longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-div-icon',
+                            html: '<div style="background-color: #dc3545; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>',
+                            iconSize: [12, 12]
+                        })
+                    }).addTo(trackingMap);
+                    trackingMarkers.push(endMarker);
+                }
+            }
+
+            // Fit map to track
+            trackingMap.fitBounds(trackingPolyline.getBounds());
+
+            // Update track summary
+            const duration = trackingData.length > 1 
+                ? Math.round((new Date(trackingData[trackingData.length - 1].timestamp) - new Date(trackingData[0].timestamp)) / (1000 * 60 * 60))
+                : 0;
+
+            document.getElementById('trackSummary').innerHTML = `
+                <h4>Track Summary</h4>
+                <div><strong>Points:</strong> ${trackingData.length}</div>
+                <div><strong>Duration:</strong> ${duration} hours</div>
+                <div><strong>Start:</strong> ${new Date(trackingData[0].timestamp).toLocaleString()}</div>
+                <div><strong>End:</strong> ${new Date(trackingData[trackingData.length - 1].timestamp).toLocaleString()}</div>
+            `;
+
+            // Update track points
+            const pointsHtml = trackingData.slice(-10).reverse().map(point => `
+                <div class="track-point">
+                    <div class="time">${new Date(point.timestamp).toLocaleString()}</div>
+                    <div class="coordinates">${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
+                    ${point.speed ? `<div>Speed: ${point.speed} km/h</div>` : ''}
+                    ${point.direction ? `<div>Direction: ${point.direction}°</div>` : ''}
+                </div>
+            `).join('');
+
+            document.getElementById('trackPoints').innerHTML = `
+                <h4>Recent Points</h4>
+                ${pointsHtml}
+            `;
+        }
+
+        function toggleOfflineMode() {
+            isOfflineMode = !isOfflineMode;
+            updateMapMode(map, isOfflineMode, 'offlineIndicator');
+        }
+
+        function toggleTrackingOfflineMode() {
+            isTrackingOfflineMode = !isTrackingOfflineMode;
+            updateMapMode(trackingMap, isTrackingOfflineMode, 'trackingOfflineIndicator');
+        }
+
+        function updateMapMode(mapInstance, isOffline, indicatorId) {
+            const indicator = document.getElementById(indicatorId);
+            
+            if (isOffline) {
+                // Remove tile layer and add grid
+                mapInstance.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        mapInstance.removeLayer(layer);
+                    }
+                });
+                addOfflineGrid(mapInstance);
+                indicator.style.display = 'block';
+            } else {
+                // Remove grid and add tile layer
+                mapInstance.eachLayer(layer => {
+                    if (layer._gridCanvas) {
+                        mapInstance.removeLayer(layer);
+                    }
+                });
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(mapInstance);
+                indicator.style.display = 'none';
+            }
+        }
+
+        function addOfflineGrid(mapInstance) {
+            const OfflineGridLayer = L.Layer.extend({
+                onAdd: function(map) {
+                    this._map = map;
+                    this._container = L.DomUtil.create('div', 'offline-grid-layer');
+                    this._container.style.position = 'absolute';
+                    this._container.style.top = '0';
+                    this._container.style.left = '0';
+                    this._container.style.width = '100%';
+                    this._container.style.height = '100%';
+                    this._container.style.pointerEvents = 'none';
+                    this._container.style.zIndex = '1';
+                    
+                    map.getPanes().overlayPane.appendChild(this._container);
+                    this._redraw();
+                    
+                    map.on('viewreset', this._redraw, this);
+                    map.on('zoom', this._redraw, this);
+                    map.on('move', this._redraw, this);
+                },
+
+                onRemove: function(map) {
+                    if (this._container && this._container.parentNode) {
+                        this._container.parentNode.removeChild(this._container);
+                    }
+                    map.off('viewreset', this._redraw, this);
+                    map.off('zoom', this._redraw, this);
+                    map.off('move', this._redraw, this);
+                },
+
+                _redraw: function() {
+                    if (!this._container) return;
+
+                    this._container.innerHTML = '';
+                    const bounds = this._map.getBounds();
+                    const zoom = this._map.getZoom();
+                    
+                    this._drawGrid(bounds, zoom);
+                    this._drawCoordinates(bounds, zoom);
+                },
+
+                _drawGrid: function(bounds, zoom) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const size = this._map.getSize();
+                    
+                    canvas.width = size.x;
+                    canvas.height = size.y;
+                    canvas.style.position = 'absolute';
+                    canvas.style.top = '0';
+                    canvas.style.left = '0';
+                    canvas.style.pointerEvents = 'none';
+                    canvas.style.zIndex = '1';
+                    
+                    this._container.appendChild(canvas);
+
+                    const gridSpacing = this._getGridSpacing(zoom);
+                    
+                    // Draw vertical lines (longitude)
+                    const startLng = Math.floor(bounds.getWest() / gridSpacing) * gridSpacing;
+                    const endLng = Math.ceil(bounds.getEast() / gridSpacing) * gridSpacing;
+                    
+                    for (let lng = startLng; lng <= endLng; lng += gridSpacing) {
+                        const startPoint = this._map.latLngToLayerPoint([bounds.getSouth(), lng]);
+                        const endPoint = this._map.latLngToLayerPoint([bounds.getNorth(), lng]);
+                        
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#e0e0e0';
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(startPoint.x, startPoint.y);
+                        ctx.lineTo(endPoint.x, endPoint.y);
+                        ctx.stroke();
+                    }
+
+                    // Draw horizontal lines (latitude)
+                    const startLat = Math.floor(bounds.getSouth() / gridSpacing) * gridSpacing;
+                    const endLat = Math.ceil(bounds.getNorth() / gridSpacing) * gridSpacing;
+                    
+                    for (let lat = startLat; lat <= endLat; lat += gridSpacing) {
+                        const startPoint = this._map.latLngToLayerPoint([lat, bounds.getWest()]);
+                        const endPoint = this._map.latLngToLayerPoint([lat, bounds.getEast()]);
+                        
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#e0e0e0';
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(startPoint.x, startPoint.y);
+                        ctx.lineTo(endPoint.x, endPoint.y);
+                        ctx.stroke();
+                    }
+                },
+
+                _drawCoordinates: function(bounds, zoom) {
+                    const gridSpacing = this._getGridSpacing(zoom);
+                    const fontSize = Math.max(10, Math.min(14, 12 + zoom - 10));
+                    
+                    // Draw longitude labels
+                    const startLng = Math.floor(bounds.getWest() / gridSpacing) * gridSpacing;
+                    const endLng = Math.ceil(bounds.getEast() / gridSpacing) * gridSpacing;
+                    
+                    for (let lng = startLng; lng <= endLng; lng += gridSpacing) {
+                        const point = this._map.latLngToLayerPoint([bounds.getCenter().lat, lng]);
+                        const label = document.createElement('div');
+                        label.textContent = `${lng.toFixed(2)}°`;
+                        label.style.position = 'absolute';
+                        label.style.left = `${point.x + 5}px`;
+                        label.style.top = '10px';
+                        label.style.fontSize = `${fontSize}px`;
+                        label.style.color = '#666';
+                        label.style.fontWeight = 'bold';
+                        label.style.pointerEvents = 'none';
+                        label.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+                        label.style.padding = '2px 4px';
+                        label.style.borderRadius = '2px';
+                        label.style.zIndex = '2';
+                        
+                        this._container.appendChild(label);
+                    }
+
+                    // Draw latitude labels
+                    const startLat = Math.floor(bounds.getSouth() / gridSpacing) * gridSpacing;
+                    const endLat = Math.ceil(bounds.getNorth() / gridSpacing) * gridSpacing;
+                    
+                    for (let lat = startLat; lat <= endLat; lat += gridSpacing) {
+                        const point = this._map.latLngToLayerPoint([lat, bounds.getCenter().lng]);
+                        const label = document.createElement('div');
+                        label.textContent = `${lat.toFixed(2)}°`;
+                        label.style.position = 'absolute';
+                        label.style.left = '10px';
+                        label.style.top = `${point.y + 5}px`;
+                        label.style.fontSize = `${fontSize}px`;
+                        label.style.color = '#666';
+                        label.style.fontWeight = 'bold';
+                        label.style.pointerEvents = 'none';
+                        label.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+                        label.style.padding = '2px 4px';
+                        label.style.borderRadius = '2px';
+                        label.style.zIndex = '2';
+                        
+                        this._container.appendChild(label);
+                    }
+                },
+
+                _getGridSpacing: function(zoom) {
+                    if (zoom >= 15) return 0.01;
+                    if (zoom >= 12) return 0.1;
+                    if (zoom >= 8) return 1;
+                    if (zoom >= 4) return 5;
+                    return 10;
+                }
+            });
+
+            const gridLayer = new OfflineGridLayer();
+            gridLayer._gridCanvas = true; // Mark as grid layer
+            mapInstance.addLayer(gridLayer);
+        }
+
+        function connectWebSocket() {
+            if (ws) {
+                ws.close();
+                return;
+            }
+
+            try {
+                ws = new WebSocket(config.wsUrl);
+                
+                ws.onopen = function() {
+                    updateStatus(true);
+                    console.log('WebSocket connected');
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        processData(data);
+                    } catch (error) {
+                        console.error('Error parsing WebSocket data:', error);
+                    }
+                };
+                
+                ws.onclose = function() {
+                    updateStatus(false);
+                    console.log('WebSocket disconnected');
+                    ws = null;
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateStatus(false);
+                };
+            } catch (error) {
+                console.error('Error connecting to WebSocket:', error);
                 updateStatus(false);
             }
         }
 
-        // Update the UI with new data
-        function updateUI(data) {
-            if (!data || !data.length) return;
-            // Filter by selected device
-            let filtered = selectedDeviceId ? data.filter(d => d.deviceId === selectedDeviceId) : data;
-            if (!filtered.length) filtered = [data[0]];
-            
-            lastData = filtered[0];
-            
-            // Debug logging
-            console.log('Frontend received data:', {
-                packetCount: filtered.length,
-                selectedPacketIndex: filtered.indexOf(lastData),
-                latestPacket: {
-                    deviceId: lastData.deviceId,
-                    imei: lastData.imei,
-                    latitude: lastData.latitude,
-                    longitude: lastData.longitude,
-                    speed: lastData.speed,
-                    direction: lastData.direction,
-                    height: lastData.height,
-                    satellites: lastData.satellites,
-                    supplyVoltage: lastData.supplyVoltage,
-                    batteryVoltage: lastData.batteryVoltage,
-                    temperature: lastData.temperature,
-                    status: lastData.status,
-                    hasTags: !!lastData.tags,
-                    tagCount: lastData.tags ? Object.keys(lastData.tags).length : 0
-                }
-            });
-            
-            // Update statistics
-            packetCount = filtered.length;
-            devices.clear();
-            filtered.forEach(packet => {
-                if (packet.deviceId) devices.add(packet.deviceId);
-            });
-
-            document.getElementById('packetCount').textContent = packetCount;
-            document.getElementById('deviceCount').textContent = devices.size;
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-
-            // Update location data
-            if (lastData.latitude && lastData.longitude) {
-                document.getElementById('coordinates').textContent = 
-                    `${lastData.latitude.toFixed(6)}, ${lastData.longitude.toFixed(6)}`;
-                updateMap(lastData.latitude, lastData.longitude);
-            }
-
-            // Update device info
-            document.getElementById('deviceId').textContent = lastData.deviceId || 'Unknown';
-            document.getElementById('speed').textContent = lastData.speed ? `${lastData.speed.toFixed(1)} km/h` : 'No data';
-            document.getElementById('direction').textContent = lastData.direction ? `${lastData.direction}°` : 'No data';
-            document.getElementById('height').textContent = lastData.height ? `${lastData.height}m` : 'No data';
-            document.getElementById('satellites').textContent = lastData.satellites || 'No data';
-
-            // Update device status
-            document.getElementById('supplyVoltage').textContent = lastData.supplyVoltage ? `${lastData.supplyVoltage}mV` : 'No data';
-            document.getElementById('batteryVoltage').textContent = lastData.batteryVoltage ? `${lastData.batteryVoltage}mV` : 'No data';
-            document.getElementById('temperature').textContent = lastData.temperature ? `${lastData.temperature}°C` : 'No data';
-            document.getElementById('status').textContent = lastData.status || 'No data';
-            document.getElementById('packetType').textContent = lastData.packetType || 'No data';
-            document.getElementById('imei').textContent = lastData.imei || 'No data';
-
-            // Update all parameters
-            updateParameters(lastData);
-
-            // Update device dropdown
-            updateDeviceDropdown(Array.from(devices));
-        }
-
-        // Update parameters display
-        function updateParameters(packet) {
-            const container = document.getElementById('parametersContainer');
-            
-            if (!packet.tags || Object.keys(packet.tags).length === 0) {
-                container.innerHTML = '<div class="no-data">No parameters received yet</div>';
-                return;
-            }
-
-            const parametersHtml = Object.entries(packet.tags).map(([tagHex, tagData]) => {
-                let displayValue = tagData.value;
-                let ledHtml = '';
-                
-                // Format different types of values
-                if (typeof tagData.value === 'object') {
-                    if (tagData.type === 'coordinates') {
-                        displayValue = `${tagData.value.latitude.toFixed(6)}, ${tagData.value.longitude.toFixed(6)} (${tagData.value.satellites} sats)`;
-                    } else if (tagData.type === 'speedDirection') {
-                        displayValue = `${tagData.value.speed.toFixed(1)} km/h, ${tagData.value.direction}°`;
-                    } else if (tagData.type === 'outputs') {
-                        displayValue = `Raw: ${tagData.value.raw} (${tagData.value.binary})`;
-                        // Create LED indicators for outputs
-                        ledHtml = '<div class="led-container">';
-                        for (let i = 0; i < 16; i++) {
-                            const isOn = tagData.value.states[`output${i}`];
-                            ledHtml += `
-                                <div class="led-item">
-                                    <div class="led ${isOn ? 'on' : 'off'}"></div>
-                                    <span class="led-label">O${i}</span>
-                                </div>
-                            `;
-                        }
-                        ledHtml += '</div>';
-                    } else if (tagData.type === 'inputs') {
-                        displayValue = `Raw: ${tagData.value.raw} (${tagData.value.binary})`;
-                        // Create LED indicators for inputs
-                        ledHtml = '<div class="led-container">';
-                        for (let i = 0; i < 16; i++) {
-                            const isOn = tagData.value.states[`input${i}`];
-                            ledHtml += `
-                                <div class="led-item">
-                                    <div class="led ${isOn ? 'on' : 'off'}"></div>
-                                    <span class="led-label">I${i}</span>
-                                </div>
-                            `;
-                        }
-                        ledHtml += '</div>';
-                    } else {
-                        displayValue = JSON.stringify(tagData.value);
-                    }
-                } else if (tagData.type === 'datetime') {
-                    displayValue = new Date(tagData.value).toLocaleString();
-                } else if (tagData.type === 'uint16' && tagData.description.includes('Voltage')) {
-                    displayValue = `${tagData.value} mV`;
-                } else if (tagData.type === 'int8' && tagData.description.includes('Temperature')) {
-                    displayValue = `${tagData.value}°C`;
-                } else if (tagData.type === 'uint16' && tagData.description.includes('Height')) {
-                    displayValue = `${tagData.value}m`;
-                }
-
-                return `
-                    <div class="parameter-item">
-                        <div class="parameter-name">${tagData.description} (${tagHex})</div>
-                        <div class="parameter-value">${displayValue}</div>
-                        ${ledHtml}
-                        <div class="parameter-description">${tagData.type}</div>
-                    </div>
-                `;
-            }).join('');
-
-            container.innerHTML = `
-                <div class="parameters-grid">
-                    ${parametersHtml}
-                </div>
-            `;
-        }
-
-        // Update map with new coordinates
-        function updateMap(lat, lon) {
-            const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.01},${lat-0.01},${lon+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lon}`;
-            const mapFrame = document.querySelector('#map iframe');
-            if (mapFrame) {
-                mapFrame.src = mapUrl;
-            }
-        }
-
-        // Update connection status
         function updateStatus(connected) {
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
@@ -1021,339 +916,159 @@
             }
         }
 
-        // Modal functions
-        function openDownloadModal() {
-            document.getElementById('downloadModal').style.display = 'block';
-            // Set default end date to now
-            const now = new Date();
-            const nowStr = now.toISOString().slice(0, 16);
-            document.getElementById('endDate').value = nowStr;
+        function processData(data) {
+            if (!data || typeof data !== 'object') return;
             
-            // Set default start date to 1 hour ago
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            const oneHourAgoStr = oneHourAgo.toISOString().slice(0, 16);
-            document.getElementById('startDate').value = oneHourAgoStr;
+            // Add timestamp if not present
+            if (!data.timestamp) {
+                data.timestamp = new Date().toISOString();
+            }
+            
+            // Add to data array
+            dataRecords.unshift(data);
+            
+            // Limit records
+            if (dataRecords.length > config.maxRecords) {
+                dataRecords = dataRecords.slice(0, config.maxRecords);
+            }
+            
+            // Update display
+            updateCurrentData();
+            updateMap(data);
         }
 
-        function closeDownloadModal() {
-            document.getElementById('downloadModal').style.display = 'none';
+        function updateCurrentData() {
+            const container = document.getElementById('currentData');
+            
+            if (dataRecords.length === 0) {
+                container.innerHTML = '<div class="no-data">No data available</div>';
+                return;
+            }
+            
+            const latestData = dataRecords[0];
+            const html = `
+                <div class="data-item">
+                    <div class="data-label">Device ID</div>
+                    <div class="data-value">${latestData.deviceId || latestData.imei || 'Unknown'}</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Timestamp</div>
+                    <div class="data-value">${new Date(latestData.timestamp).toLocaleString()}</div>
+                </div>
+                ${latestData.latitude && latestData.longitude ? `
+                <div class="data-item">
+                    <div class="data-label">Coordinates</div>
+                    <div class="data-value coordinates">${latestData.latitude.toFixed(6)}, ${latestData.longitude.toFixed(6)}</div>
+                </div>
+                ` : ''}
+                ${latestData.speed ? `
+                <div class="data-item">
+                    <div class="data-label">Speed</div>
+                    <div class="data-value">${latestData.speed} km/h</div>
+                </div>
+                ` : ''}
+                ${latestData.direction ? `
+                <div class="data-item">
+                    <div class="data-label">Direction</div>
+                    <div class="data-value">${latestData.direction}°</div>
+                </div>
+                ` : ''}
+                ${latestData.voltage ? `
+                <div class="data-item">
+                    <div class="data-label">Voltage</div>
+                    <div class="data-value">${latestData.voltage}V</div>
+                </div>
+                ` : ''}
+            `;
+            
+            container.innerHTML = html;
         }
 
-        // Handle time period change
-        function handleTimePeriodChange() {
-            const timePeriod = document.getElementById('timePeriod').value;
-            const customRange = document.getElementById('customRange');
+        function updateMap(data) {
+            if (!data.latitude || !data.longitude) return;
             
-            if (timePeriod === 'custom') {
-                customRange.style.display = 'block';
+            const deviceId = data.deviceId || data.imei || 'unknown';
+            
+            // Remove existing marker for this device
+            if (markers.has(deviceId)) {
+                map.removeLayer(markers.get(deviceId));
+            }
+            
+            // Create new marker
+            const marker = L.marker([data.latitude, data.longitude]).addTo(map);
+            
+            // Create popup content
+            const popupContent = `
+                <div style="min-width: 200px;">
+                    <h4>Device: ${deviceId}</h4>
+                    <p><strong>Time:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+                    <p><strong>Location:</strong> ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</p>
+                    ${data.speed ? `<p><strong>Speed:</strong> ${data.speed} km/h</p>` : ''}
+                    ${data.direction ? `<p><strong>Direction:</strong> ${data.direction}°</p>` : ''}
+                    ${data.voltage ? `<p><strong>Voltage:</strong> ${data.voltage}V</p>` : ''}
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            markers.set(deviceId, marker);
+            
+            // Fit map to show all markers
+            const markerGroup = L.featureGroup(Array.from(markers.values()));
+            if (markers.size === 1) {
+                map.setView([data.latitude, data.longitude], 13);
             } else {
-                customRange.style.display = 'none';
+                map.fitBounds(markerGroup.getBounds());
             }
         }
 
-        // Convert data to CSV format (flatten nested objects and include tags, userdata, modbus)
-        function flattenRecord(record) {
-            const flat = { ...record };
-            // Flatten tags
-            if (record.tags && typeof record.tags === 'object') {
-                Object.entries(record.tags).forEach(([tagKey, tagData]) => {
-                    if (typeof tagData.value === 'object' && tagData.value !== null) {
-                        Object.entries(tagData.value).forEach(([k, v]) => {
-                            flat[`tag_${tagKey}_${k}`] = v;
-                        });
-                    } else {
-                        flat[`tag_${tagKey}`] = tagData.value;
+        function clearData() {
+            if (confirm('Are you sure you want to clear all data?')) {
+                dataRecords = [];
+                markers.clear();
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
                     }
                 });
-            }
-            // Flatten userdata
-            if (record.userdata && typeof record.userdata === 'object') {
-                Object.entries(record.userdata).forEach(([k, v]) => {
-                    flat[`userdata_${k}`] = v;
-                });
-            }
-            // Flatten modbus
-            if (record.modbus && typeof record.modbus === 'object') {
-                Object.entries(record.modbus).forEach(([k, v]) => {
-                    flat[`modbus_${k}`] = v;
-                });
-            }
-            return flat;
-        }
-
-        function convertToCSV(data) {
-            if (!data || data.length === 0) return '';
-            // Flatten all records
-            const flatData = data.map(flattenRecord);
-            // Get all possible fields
-            const allFields = new Set();
-            flatData.forEach(record => {
-                Object.keys(record).forEach(key => {
-                    if (key !== 'tags' && key !== 'rawData') {
-                        allFields.add(key);
-                    }
-                });
-            });
-            const fields = Array.from(allFields).sort();
-            const csvRows = [];
-            csvRows.push(fields.join(','));
-            flatData.forEach(record => {
-                const row = fields.map(field => {
-                    let value = record[field];
-                    if (value === null || value === undefined) {
-                        return '';
-                    } else if (typeof value === 'object') {
-                        return JSON.stringify(value);
-                    } else if (typeof value === 'string' && value.includes(',')) {
-                        return `"${value}"`;
-                    } else {
-                        return value;
-                    }
-                });
-                csvRows.push(row.join(','));
-            });
-            return csvRows.join('\n');
-        }
-
-        // Download data with options (update XLSX to use CSV, and clarify in alert)
-        async function downloadData() {
-            try {
-                const timePeriod = document.getElementById('timePeriod').value;
-                const format = document.getElementById('downloadFormat').value;
-                let startDate, endDate;
-
-                // Calculate date range based on selection
-                if (timePeriod === 'custom') {
-                    startDate = new Date(document.getElementById('startDate').value);
-                    endDate = new Date(document.getElementById('endDate').value);
-                } else {
-                    endDate = new Date();
-                    switch (timePeriod) {
-                        case '1h':
-                            startDate = new Date(endDate.getTime() - 60 * 60 * 1000);
-                            break;
-                        case '6h':
-                            startDate = new Date(endDate.getTime() - 6 * 60 * 60 * 1000);
-                            break;
-                        case '24h':
-                            startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-                            break;
-                        case '7d':
-                            startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-                            break;
-                        case '30d':
-                            startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-                            break;
-                        default: // 'all'
-                            startDate = new Date(0);
-                            break;
-                    }
-                }
-
-                // Get data from API
-                const response = await fetch('/api/data/latest?limit=10000');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch data');
-                }
-                
-                let data = await response.json();
-                
-                // Filter data by date range
-                data = data.filter(packet => {
-                    const packetDate = new Date(packet.timestamp);
-                    return packetDate >= startDate && packetDate <= endDate;
-                });
-
-                // Format data based on selected format
-                let downloadData, filename, mimeType;
-                
-                switch (format) {
-                    case 'json':
-                        downloadData = JSON.stringify(data, null, 2);
-                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-                        mimeType = 'application/json';
-                        break;
-                        
-                    case 'csv':
-                        downloadData = convertToCSV(data);
-                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
-                        mimeType = 'text/csv';
-                        break;
-                        
-                    case 'xlsx':
-                        downloadData = convertToCSV(data);
-                        filename = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
-                        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                        break;
-                }
-
-                // Download the file
-                const blob = new Blob([downloadData], { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                closeDownloadModal();
-                if (format === 'xlsx') {
-                    alert('Excel (XLSX) export is CSV-compatible. For best results, use CSV format or open the .xlsx in Excel.');
-                } else {
-                    alert(`Data downloaded successfully! (${data.length} records)`);
-                }
-                
-            } catch (error) {
-                console.error('Error downloading data:', error);
-                alert('Error downloading data. Please try again.');
+                updateCurrentData();
             }
         }
 
-        // Clear stored data
-        async function clearData() {
-            if (confirm('Are you sure you want to clear all stored data?')) {
-                try {
-                    const response = await fetch('/api/clear', { method: 'POST' });
-                    if (response.ok) {
-                        // Reset UI
-                        document.getElementById('packetCount').textContent = '0';
-                        document.getElementById('deviceCount').textContent = '0';
-                        document.getElementById('lastUpdate').textContent = '--';
-                        document.getElementById('parametersContainer').innerHTML = '<div class="no-data">No parameters received yet</div>';
-                        
-                        // Reset location data
-                        document.getElementById('coordinates').textContent = 'No GPS data';
-                        document.getElementById('deviceId').textContent = 'No data';
-                        document.getElementById('speed').textContent = 'No data';
-                        document.getElementById('direction').textContent = 'No data';
-                        document.getElementById('height').textContent = 'No data';
-                        document.getElementById('satellites').textContent = 'No data';
-                        
-                        // Reset device status
-                        document.getElementById('supplyVoltage').textContent = 'No data';
-                        document.getElementById('batteryVoltage').textContent = 'No data';
-                        document.getElementById('temperature').textContent = 'No data';
-                        document.getElementById('status').textContent = 'No data';
-                        document.getElementById('packetType').textContent = 'No data';
-                        document.getElementById('imei').textContent = 'No data';
-                        
-                        alert('Data cleared successfully!');
-                    }
-                } catch (error) {
-                    console.error('Error clearing data:', error);
-                    alert('Error clearing data. Please try again.');
-                }
-            }
-        }
-
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', init);
-        
-        // Add event listener for time period change
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('timePeriod').addEventListener('change', handleTimePeriodChange);
-        });
-
-        // Toggle foldable sections
-        function toggleSection(sectionId) {
-            const content = document.getElementById(sectionId + '-content');
-            const icon = document.getElementById(sectionId + '-icon');
-            
-            if (content.classList.contains('collapsed')) {
-                // Expand section
-                content.classList.remove('collapsed');
-                icon.classList.remove('collapsed');
-                icon.textContent = '▼';
-            } else {
-                // Collapse section
-                content.classList.add('collapsed');
-                icon.classList.add('collapsed');
-                icon.textContent = '▶';
+        function downloadData() {
+            if (dataRecords.length === 0) {
+                alert('No data to download');
+                return;
             }
             
-            // Save the state
-            saveFoldableState();
+            const headers = ['Time', 'Device ID', 'Latitude', 'Longitude', 'Speed (km/h)', 'Direction', 'Voltage'];
+            const csvContent = [
+                headers.join(','),
+                ...dataRecords.map(record => [
+                    new Date(record.timestamp).toISOString(),
+                    record.deviceId || record.imei || 'Unknown',
+                    record.latitude || '',
+                    record.longitude || '',
+                    record.speed || '',
+                    record.direction || '',
+                    record.voltage || ''
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `galileosky_data_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
 
-        // Initialize foldable sections state (optional: remember user preferences)
-        function initializeFoldableSections() {
-            // You can add localStorage to remember user preferences
-            const savedState = localStorage.getItem('foldableSections');
-            if (savedState) {
-                const state = JSON.parse(savedState);
-                Object.keys(state).forEach(sectionId => {
-                    if (!state[sectionId]) { // If section was collapsed
-                        toggleSection(sectionId);
-                    }
-                });
-            }
-        }
-
-        // Save foldable sections state
-        function saveFoldableState() {
-            const sections = ['stats', 'location', 'status', 'parameters', 'map'];
-            const state = {};
-            sections.forEach(sectionId => {
-                const content = document.getElementById(sectionId + '-content');
-                state[sectionId] = !content.classList.contains('collapsed');
-            });
-            localStorage.setItem('foldableSections', JSON.stringify(state));
-        }
-
-        // --- Device selection logic ---
-        function onDeviceChange() {
-            selectedDeviceId = document.getElementById('deviceSelect').value;
-            pollData(); // Refresh data for selected device
-        }
-
-        // --- Update device dropdown and filter data ---
-        function updateDeviceDropdown(deviceList) {
-            const select = document.getElementById('deviceSelect');
-            const current = select.value;
-            select.innerHTML = '<option value="">All Devices</option>';
-            deviceList.forEach(deviceId => {
-                const opt = document.createElement('option');
-                opt.value = deviceId;
-                opt.textContent = deviceId;
-                select.appendChild(opt);
-            });
-            select.value = current;
-        }
-
-        // --- Offline grid map toggle ---
-        function toggleOfflineMap() {
-            offlineMode = !offlineMode;
-            loadMap();
-        }
-
-        // --- Draw simple grid map ---
-        function drawGridMap() {
-            const canvas = document.getElementById('gridMap');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width = canvas.offsetWidth;
-            const h = canvas.height = canvas.offsetHeight;
-            ctx.clearRect(0,0,w,h);
-            ctx.strokeStyle = '#ccc';
-            for (let i = 0; i < w; i += w/10) ctx.strokeRect(i,0,1,h);
-            for (let j = 0; j < h; j += h/10) ctx.strokeRect(0,j,w,1);
-            ctx.fillStyle = '#888';
-            ctx.font = '12px monospace';
-            ctx.fillText('No map tiles (offline)', 10, 20);
-        }
-
-        // --- Add toggle button to map section ---
-        document.addEventListener('DOMContentLoaded', function() {
-            const mapContent = document.getElementById('map-content');
-            if (mapContent) {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-secondary';
-                btn.style.marginBottom = '10px';
-                btn.textContent = 'Toggle Grid/Map';
-                btn.onclick = toggleOfflineMap;
-                mapContent.insertBefore(btn, mapContent.firstChild);
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.close();
             }
         });
     </script>
