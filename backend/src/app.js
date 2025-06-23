@@ -11,6 +11,7 @@ const websocketHandler = require('./services/websocketHandler');
 const GalileoskyParser = require('./services/parser');
 const deviceManager = require('./services/deviceManager');
 const packetProcessor = require('./services/packetProcessor');
+const packetQueue = require('./services/packetQueue');
 const dataAggregator = require('./services/dataAggregator');
 const alertManager = require('./services/alertManager');
 const logger = require('./utils/logger');
@@ -36,6 +37,39 @@ if (fs.existsSync(frontendBuildPath)) {
 
 // Initialize WebSocket
 websocketHandler.initialize(server);
+
+// Monitor packet queue performance
+packetQueue.on('queued', (item) => {
+    logger.debug('Packet queued', {
+        packetId: item.id,
+        queueSize: packetQueue.queue.length,
+        processingCount: packetQueue.processing.size
+    });
+});
+
+packetQueue.on('processed', (item, processingTime) => {
+    logger.debug('Packet processed', {
+        packetId: item.id,
+        processingTime,
+        queueSize: packetQueue.queue.length
+    });
+});
+
+packetQueue.on('failed', (item, error) => {
+    logger.error('Packet processing failed permanently', {
+        packetId: item.id,
+        error: error.message,
+        retries: item.retries
+    });
+});
+
+// Log queue statistics periodically
+setInterval(() => {
+    const stats = packetQueue.getStats();
+    if (stats.queueSize > 0 || stats.processingCount > 0) {
+        logger.info('Packet queue statistics', stats);
+    }
+}, 60000); // Log every minute
 
 // Mount routes directly
 app.use('/api/devices', require('./routes/devices'));
@@ -76,24 +110,15 @@ const tcpServer = net.createServer((socket) => {
                 buffer = data;
             }
 
+            // Process all complete packets in the buffer
+            const packets = [];
+            
             while (buffer.length >= 3) {  // Minimum packet size (HEAD + LENGTH)
                 const packetType = buffer.readUInt8(0);
                 const rawLength = buffer.readUInt16LE(1);
                 // Only use the lower 15 bits for length
                 const actualLength = rawLength & 0x7FFF;  // Mask with 0x7FFF to get only lower 15 bits
                 const totalLength = actualLength + 3;  // HEAD + LENGTH + DATA + CRC
-
-                // Log raw packet data for debugging
-                logger.info('Raw packet data:', {
-                    packetType: `0x${packetType.toString(16).padStart(2, '0')}`,
-                    rawLength: `0x${rawLength.toString(16).padStart(4, '0')}`,
-                    actualLength,
-                    totalLength,
-                    bufferLength: buffer.length,
-                    hex: buffer.slice(0, Math.min(totalLength + 2, buffer.length)).toString('hex').toUpperCase(),
-                    hasUnsentData: buffer.length > totalLength + 2,
-                    timestamp: new Date().toISOString()
-                });
 
                 // Check if we have a complete packet
                 if (buffer.length < totalLength + 2) {  // +2 for CRC
@@ -124,67 +149,68 @@ const tcpServer = net.createServer((socket) => {
                 // Handle different packet types
                 if (isIgnorablePacket) {
                     logger.info('Ignoring packet type 0x15');
+                    // Send confirmation immediately for ignorable packets
+                    const packetChecksum = packet.readUInt16LE(packet.length - 2);
+                    const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
+                    socket.write(confirmation);
+                    logger.info('Confirmation sent for ignorable packet:', {
+                        address: socket.remoteAddress + ':' + socket.remotePort,
+                        hex: confirmation.toString('hex').toUpperCase(),
+                        checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
+                        timestamp: new Date().toISOString()
+                    });
                     continue;
                 }
 
-                try {
-                    if (isIgnorablePacket) {
-                        // Handle ignorable packet (0x15)
-                        const packetChecksum = packet.readUInt16LE(packet.length - 2);
-                        const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
-                        socket.write(confirmation);
-                        logger.info('Confirmation sent for ignorable packet:', {
-                            address: socket.remoteAddress + ':' + socket.remotePort,
-                            hex: confirmation.toString('hex').toUpperCase(),
-                            checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
-                            timestamp: new Date().toISOString()
-                        });
-                    } else if (isExtensionPacket) {
-                        // Handle extension packet
-                        const packetChecksum = packet.readUInt16LE(packet.length - 2);
-                        const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
-                        socket.write(confirmation);
-                        logger.info('Confirmation sent for extension packet:', {
-                            address: socket.remoteAddress + ':' + socket.remotePort,
-                            hex: confirmation.toString('hex').toUpperCase(),
-                            checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
-                            timestamp: new Date().toISOString()
-                        });
-                    } else {
-                        // Handle main packet (both < 32 bytes and >= 32 bytes)
-                        const parsedData = await parser.parse(packet);
-                        
-                        // Get the checksum from the received packet
-                        const packetChecksum = packet.readUInt16LE(packet.length - 2);
-                        const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
-                        
-                        socket.write(confirmation);
-                        logger.info('Confirmation sent:', {
-                            address: socket.remoteAddress + ':' + socket.remotePort,
-                            hex: confirmation.toString('hex').toUpperCase(),
-                            checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
-                            packetLength: actualLength,
-                            timestamp: new Date().toISOString()
-                        });
-
-                        // Process the parsed data
-                        if (parsedData) {
-                            // Handle the parsed data
-                            logger.info('Parsed data:', {
-                                address: socket.remoteAddress + ':' + socket.remotePort,
-                                data: parsedData,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    }
-                } catch (error) {
-                    logger.error('Error processing main packet:', {
+                if (isExtensionPacket) {
+                    // Handle extension packet immediately
+                    const packetChecksum = packet.readUInt16LE(packet.length - 2);
+                    const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
+                    socket.write(confirmation);
+                    logger.info('Confirmation sent for extension packet:', {
                         address: socket.remoteAddress + ':' + socket.remotePort,
-                        error: error.message,
+                        hex: confirmation.toString('hex').toUpperCase(),
+                        checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
                         timestamp: new Date().toISOString()
                     });
+                    continue;
                 }
+
+                // Queue main packets for asynchronous processing
+                packets.push({
+                    packet,
+                    packetType,
+                    actualLength,
+                    totalLength
+                });
             }
+
+            // Queue all main packets for processing
+            for (const packetInfo of packets) {
+                const metadata = {
+                    address: socket.remoteAddress + ':' + socket.remotePort,
+                    packetType: `0x${packetInfo.packetType.toString(16).padStart(2, '0')}`,
+                    length: packetInfo.actualLength,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Send confirmation immediately (don't wait for processing)
+                const packetChecksum = packetInfo.packet.readUInt16LE(packetInfo.packet.length - 2);
+                const confirmation = Buffer.from([0x02, packetChecksum & 0xFF, (packetChecksum >> 8) & 0xFF]);
+                socket.write(confirmation);
+                
+                logger.info('Confirmation sent:', {
+                    address: socket.remoteAddress + ':' + socket.remotePort,
+                    hex: confirmation.toString('hex').toUpperCase(),
+                    checksum: `0x${confirmation.slice(1).toString('hex').toUpperCase()}`,
+                    packetLength: packetInfo.actualLength,
+                    timestamp: new Date().toISOString()
+                });
+
+                // Queue packet for processing
+                await packetQueue.enqueue(packetInfo.packet, socket, metadata);
+            }
+
         } catch (error) {
             logger.error('Error processing data:', {
                 address: socket.remoteAddress + ':' + socket.remotePort,
@@ -238,7 +264,6 @@ tcpServer.listen(PORT, '0.0.0.0', () => {
     logger.info(`TCP server listening on port ${PORT} (all interfaces)`);
 }).on('error', (error) => {
     logger.error('TCP server error:', error);
-    process.exit(1);
 });
 
 // Handle server errors
@@ -249,6 +274,43 @@ tcpServer.on('error', (error) => {
 // Handle server close
 tcpServer.on('close', () => {
     logger.info('TCP server closed');
+});
+
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT, starting graceful shutdown...');
+    
+    // Stop accepting new connections
+    tcpServer.close(() => {
+        logger.info('TCP server stopped accepting new connections');
+    });
+    
+    // Clear packet queue
+    await packetQueue.clear();
+    
+    // Close HTTP server
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM, starting graceful shutdown...');
+    
+    // Stop accepting new connections
+    tcpServer.close(() => {
+        logger.info('TCP server stopped accepting new connections');
+    });
+    
+    // Clear packet queue
+    await packetQueue.clear();
+    
+    // Close HTTP server
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+    });
 });
 
 server.listen(config.http.port, '0.0.0.0', () => {

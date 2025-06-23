@@ -1,10 +1,11 @@
 // backend/src/routes/api.js
 const express = require('express');
 const router = express.Router();
-const { Device, FieldMapping, DataPoint } = require('../models');
+const { Device, FieldMapping, DataPoint, Record } = require('../models');
 const parser = require('../services/parser');
 const deviceMapper = require('../services/deviceMapper');
 const asyncHandler = require('../utils/asyncHandler');
+const packetQueue = require('../services/packetQueue');
 
 // Mount sub-routers
 router.use('/devices', require('./devices'));
@@ -42,6 +43,12 @@ router.get('/devices/:deviceId/data', asyncHandler(async (req, res) => {
         limit: parseInt(req.query.limit) || 100
     });
     res.json(data);
+}));
+
+// Get packet queue statistics
+router.get('/queue/stats', asyncHandler(async (req, res) => {
+    const stats = packetQueue.getStats();
+    res.json(stats);
 }));
 
 module.exports = router;
