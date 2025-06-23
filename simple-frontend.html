@@ -407,6 +407,14 @@
                 </div>
             </div>
 
+            <div class="panel" style="margin-bottom: 10px;">
+                <div style="font-size: 0.8em; color: #666;">
+                    <strong>Connection Info:</strong><br>
+                    API: <span id="apiUrlDisplay">Loading...</span><br>
+                    WebSocket: <span id="wsUrlDisplay">Loading...</span>
+                </div>
+            </div>
+
             <div class="panel">
                 <h3>Current Data</h3>
                 <div id="currentData" class="data-grid">
@@ -480,8 +488,12 @@
 
         // Configuration
         const config = {
-            apiUrl: 'http://192.168.1.114:3001',
-            wsUrl: 'ws://192.168.1.114:3001',
+            apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:3001' 
+                : `http://${window.location.hostname}:3001`,
+            wsUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'ws://localhost:3001'
+                : `ws://${window.location.hostname}:3001`,
             maxRecords: 1000
         };
 
@@ -492,6 +504,7 @@
             initializeMaps();
             loadDevices();
             setupDateTimeDefaults();
+            updateConnectionInfo();
         }
 
         function initializeMaps() {
@@ -871,35 +884,41 @@
             }
 
             try {
+                console.log('Attempting to connect to WebSocket:', config.wsUrl);
+                console.log('API URL:', config.apiUrl);
+                
                 ws = new WebSocket(config.wsUrl);
                 
                 ws.onopen = function() {
                     updateStatus(true);
-                    console.log('WebSocket connected');
+                    console.log('WebSocket connected successfully');
                 };
                 
                 ws.onmessage = function(event) {
                     try {
                         const data = JSON.parse(event.data);
+                        console.log('Received WebSocket data:', data);
                         processData(data);
                     } catch (error) {
                         console.error('Error parsing WebSocket data:', error);
                     }
                 };
                 
-                ws.onclose = function() {
+                ws.onclose = function(event) {
                     updateStatus(false);
-                    console.log('WebSocket disconnected');
+                    console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
                     ws = null;
                 };
                 
                 ws.onerror = function(error) {
                     console.error('WebSocket error:', error);
                     updateStatus(false);
+                    alert('WebSocket connection failed. Check if backend is running and accessible.');
                 };
             } catch (error) {
                 console.error('Error connecting to WebSocket:', error);
                 updateStatus(false);
+                alert('Failed to create WebSocket connection: ' + error.message);
             }
         }
 
@@ -1063,6 +1082,11 @@
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
+        }
+
+        function updateConnectionInfo() {
+            document.getElementById('apiUrlDisplay').textContent = config.apiUrl;
+            document.getElementById('wsUrlDisplay').textContent = config.wsUrl;
         }
 
         // Cleanup on page unload
