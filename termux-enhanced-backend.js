@@ -1290,13 +1290,34 @@ function handleAPIRequest(req, res) {
             }));
         } else if (pathname === '/api/devices') {
             const deviceList = Array.from(devices.entries()).map(([id, info]) => ({
-                deviceId: id,
+                imei: id,
+                name: `Device ${id}`,
                 lastSeen: info.lastSeen,
                 totalRecords: info.totalRecords,
                 lastLocation: info.lastLocation
             }));
             res.writeHead(200);
             res.end(JSON.stringify(deviceList));
+        } else if (pathname.match(/^\/api\/data\/(.+)\/tracking$/)) {
+            const deviceId = pathname.match(/^\/api\/data\/(.+)\/tracking$/)[1];
+            const startDate = new Date(parsedUrl.query.startDate);
+            const endDate = new Date(parsedUrl.query.endDate);
+            
+            // Filter data for the specific device and time range
+            const trackingData = parsedData.filter(record => {
+                const recordDate = new Date(record.timestamp);
+                return record.deviceId === deviceId && 
+                       recordDate >= startDate && 
+                       recordDate <= endDate &&
+                       record.latitude && 
+                       record.longitude;
+            });
+            
+            // Sort by timestamp
+            trackingData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            res.writeHead(200);
+            res.end(JSON.stringify(trackingData));
         } else if (pathname === '/api/data/add' && req.method === 'POST') {
             let body = '';
             req.on('data', chunk => {

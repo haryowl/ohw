@@ -506,6 +506,10 @@
             loadDevices();
             setupDateTimeDefaults();
             updateConnectionInfo();
+            // Auto-connect when page loads with retry logic
+            setTimeout(() => {
+                connectSocket();
+            }, 2000); // Wait 2 seconds for backend to be ready
         }
 
         function initializeMaps() {
@@ -557,7 +561,15 @@
                 const response = await fetch(`${config.apiUrl}/api/devices`);
                 if (response.ok) {
                     devices = await response.json();
+                    console.log('Loaded devices:', devices);
                     updateDeviceSelect();
+                    
+                    // If no devices, show a message
+                    if (devices.length === 0) {
+                        console.log('No devices found. This is normal if no data has been received yet.');
+                    }
+                } else {
+                    console.error('Failed to load devices:', response.status, response.statusText);
                 }
             } catch (error) {
                 console.error('Error loading devices:', error);
@@ -567,6 +579,15 @@
         function updateDeviceSelect() {
             const select = document.getElementById('deviceSelect');
             select.innerHTML = '<option value="">Select Device</option>';
+            
+            if (devices.length === 0) {
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = "No devices available";
+                option.disabled = true;
+                select.appendChild(option);
+                return;
+            }
             
             devices.forEach(device => {
                 const option = document.createElement('option');
@@ -909,17 +930,36 @@
                     updateStatus(false);
                     console.log('Socket disconnected. Reason:', reason);
                     socket = null;
+                    // Auto-retry connection after 5 seconds
+                    setTimeout(() => {
+                        if (!socket) {
+                            console.log('Auto-retrying connection...');
+                            connectSocket();
+                        }
+                    }, 5000);
                 });
                 
                 socket.on('connect_error', function(error) {
                     console.error('Socket connection error:', error);
                     updateStatus(false);
-                    alert('Socket connection failed. Check if backend is running and accessible.');
+                    // Auto-retry connection after 10 seconds
+                    setTimeout(() => {
+                        if (!socket) {
+                            console.log('Auto-retrying connection after error...');
+                            connectSocket();
+                        }
+                    }, 10000);
                 });
             } catch (error) {
                 console.error('Error connecting to Socket:', error);
                 updateStatus(false);
-                alert('Failed to create Socket connection: ' + error.message);
+                // Auto-retry connection after 10 seconds
+                setTimeout(() => {
+                    if (!socket) {
+                        console.log('Auto-retrying connection after exception...');
+                        connectSocket();
+                    }
+                }, 10000);
             }
         }
 
@@ -955,6 +995,13 @@
             // Update display
             updateCurrentData();
             updateMap(data);
+            
+            // Refresh device list if this is a new device
+            const deviceId = data.deviceId || data.imei;
+            if (deviceId && !devices.find(d => d.imei === deviceId)) {
+                console.log('New device detected, refreshing device list...');
+                loadDevices();
+            }
         }
 
         function updateCurrentData() {
