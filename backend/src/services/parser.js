@@ -169,7 +169,7 @@ class GalileoskyParser extends EventEmitter {
                         case 'uint8':
                             value = buffer.readUInt8(recordOffset);
                             recordOffset += 1;
-                            break;
+                    break;
                         case 'uint16':
                             value = buffer.readUInt16LE(recordOffset);
                             recordOffset += 2;
@@ -277,7 +277,6 @@ class GalileoskyParser extends EventEmitter {
                     if (this.lastIMEI) {
                         await this.saveRecordToDatabase(record, this.lastIMEI);
                     }
-                    logger.info(`Record added successfully with ${Object.keys(record.tags).length} tags`);
                 }
             } else {
                 // For packets >= 32 bytes, check if there's a 0x10 tag (Number Archive Records)
@@ -300,62 +299,23 @@ class GalileoskyParser extends EventEmitter {
                     timestamp: new Date().toISOString()
                 });
 
-                // Debug: Log packet structure to help identify record boundaries
                 if (hasMultipleRecords) {
-                    const packetHex = buffer.toString('hex').toUpperCase();
-                    logger.info('Multi-record packet structure:', {
-                        packetHex: packetHex.substring(0, 200) + (packetHex.length > 200 ? '...' : ''),
-                        length: packetHex.length,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-
-                if (hasMultipleRecords) {
-                    // Multiple records - process all records in the packet
-                    logger.info('Processing multiple records packet');
-                    
-                    let recordCount = 0;
+                    // Multiple records - look for 0x10 tags
                     while (currentOffset < endOffset - 2) {
-                        // Find the next record boundary
-                        let recordStart = currentOffset;
-                        let recordEnd = endOffset - 2;
-                        
-                        // Look for the next record separator (0x00) followed by record starter (0x10 or 0x20)
-                        for (let i = currentOffset + 1; i < endOffset - 3; i++) {
-                            if (buffer.readUInt8(i) === 0x00) {
-                                // Check if next byte is a record starter (0x10 or 0x20)
-                                const nextByte = buffer.readUInt8(i + 1);
-                                if (nextByte === 0x10 || nextByte === 0x20) {
-                                    recordEnd = i;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        // Ensure we have a valid record length
-                        if (recordEnd <= recordStart) {
-                            logger.warn(`Invalid record boundary: start=${recordStart}, end=${recordEnd}, skipping`);
-                            break;
-                        }
-                        
-                        logger.info(`Processing record ${recordCount + 1}:`, {
-                            recordStart,
-                            recordEnd,
-                            recordLength: recordEnd - recordStart,
-                            firstTag: `0x${buffer.readUInt8(recordStart).toString(16).padStart(2, '0')}`,
-                            timestamp: new Date().toISOString()
-                        });
-                        
-                        // Parse the current record
-                        const record = { tags: {} };
-                        let recordOffset = recordStart;
+                        if (buffer.readUInt8(currentOffset) !== 0x10) {
+                            currentOffset++;
+                        continue;
+                    }
 
-                        while (recordOffset < recordEnd) {
+                        const record = { tags: {} };
+                        let recordOffset = currentOffset;
+
+                        while (recordOffset < endOffset - 2) {
                             const tag = buffer.readUInt8(recordOffset);
                             recordOffset++;
 
-                            // Stop parsing if we encounter the record separator (0x00)
-                            if (tag === 0x00) {
+                            if (tag === 0x10 && recordOffset > currentOffset + 1) {
+                                recordOffset--;
                                 break;
                             }
 
@@ -487,20 +447,10 @@ class GalileoskyParser extends EventEmitter {
                             if (this.lastIMEI) {
                                 await this.saveRecordToDatabase(record, this.lastIMEI);
                             }
-                            logger.info(`Record ${recordCount + 1} added successfully with ${Object.keys(record.tags).length} tags:`, {
-                                tags: Object.keys(record.tags),
-                                timestamp: new Date().toISOString()
-                            });
-                        } else {
-                            logger.warn(`Record ${recordCount + 1} had no valid tags`);
                         }
 
-                        // Move to next record
-                        currentOffset = recordEnd;
-                        recordCount++;
+                        currentOffset = recordOffset;
                     }
-                    
-                    logger.info(`Completed processing ${recordCount} records from packet`);
                 } else {
                     // Single record - parse directly from currentOffset
                     logger.info('Processing single record packet');
@@ -639,7 +589,6 @@ class GalileoskyParser extends EventEmitter {
                         if (this.lastIMEI) {
                             await this.saveRecordToDatabase(record, this.lastIMEI);
                         }
-                        logger.info(`Record added successfully with ${Object.keys(record.tags).length} tags`);
                     }
                 }
             }
@@ -1544,56 +1493,6 @@ class GalileoskyParser extends EventEmitter {
             logger.info(`Record saved for device ${imei} with ${Object.keys(record.tags).length} tags`);
         } catch (error) {
             logger.error(`Error saving record to database: ${error.message}`);
-            throw error;
-        }
-    }
-
-    /**
-     * Parse a single packet (for use by packet processor)
-     */
-    async parseSinglePacket(buffer) {
-        try {
-            if (!Buffer.isBuffer(buffer)) {
-                throw new Error('Input must be a buffer');
-            }
-
-            // Log raw data
-            logger.info('Raw packet data:', buffer.toString('hex'));
-
-            if (buffer.length < 3) { // Minimum packet size (header + length)
-                throw new Error('Packet too short');
-            }
-
-            const header = buffer.readUInt8(0);
-            
-            // Validate packet structure and checksum
-            const { hasUnsentData, actualLength, rawLength } = this.validatePacket(buffer);
-            
-            // Use PacketTypeHandler to determine packet type
-            if (PacketTypeHandler.isMainPacket(header)) {
-                // This is a Head Packet or Main Packet
-                const result = await this.parseMainPacket(buffer, 0, actualLength);
-                result.hasUnsentData = hasUnsentData;
-                result.actualLength = actualLength;
-                result.rawLength = rawLength;
-                return result;
-            } else if (PacketTypeHandler.isIgnorablePacket(header)) {
-                // This is an ignorable packet, just needs confirmation
-                return await this.parseIgnorablePacket(buffer);
-            } else {
-                // This is an extension packet
-                return {
-                    type: 'extension',
-                    header: header,
-                    length: buffer.readUInt16LE(1),
-                    hasUnsentData,
-                    actualLength,
-                    rawLength,
-                    raw: buffer
-                };
-            }
-        } catch (error) {
-            logger.error('Parsing error:', error);
             throw error;
         }
     }

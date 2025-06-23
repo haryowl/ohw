@@ -347,6 +347,9 @@ async function parseExtendedTags(buffer, offset) {
 // Parse main packet following parser.js implementation
 async function parseMainPacket(buffer, offset = 0, actualLength) {
     try {
+        console.log('=== PARSE MAIN PACKET START ===');
+        console.log('Input parameters:', { offset, actualLength });
+        
         const result = {
             header: buffer.readUInt8(offset),
             length: actualLength,
@@ -356,8 +359,17 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
         let currentOffset = offset + 3;
         const endOffset = offset + actualLength;
+        
+        console.log('Packet analysis:', {
+            header: `0x${result.header.toString(16).padStart(2, '0')}`,
+            actualLength,
+            currentOffset,
+            endOffset,
+            isSmallPacket: actualLength < 32
+        });
 
         if (actualLength < 32) {
+            console.log('Processing SMALL PACKET (< 32 bytes)');
             // Single record packet
             const record = { tags: {} };
             let recordOffset = currentOffset;
@@ -388,6 +400,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     console.warn(`Unknown tag: ${tagHex}`);
                     continue;
                 }
+
+                console.log('Processing tag:', { tagHex, type: definition.type, length: definition.length });
 
                 // Determine how many bytes we need to read
                 let bytesToRead = 0;
@@ -459,7 +473,21 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                         recordOffset += 4;
                         break;
                     case 'string':
-                        value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                        // Special handling for IMEI (tag 0x03) - decode as BCD
+                        if (tag === 0x03) {
+                            // IMEI is stored as BCD (Binary Coded Decimal)
+                            const imeiBytes = buffer.slice(recordOffset, recordOffset + definition.length);
+                            let imei = '';
+                            for (let i = 0; i < imeiBytes.length; i++) {
+                                const byte = imeiBytes[i];
+                                const high = (byte >> 4) & 0x0F;
+                                const low = byte & 0x0F;
+                                imei += high.toString() + low.toString();
+                            }
+                            value = imei;
+                        } else {
+                            value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                        }
                         recordOffset += definition.length;
                         break;
                     case 'datetime':
@@ -850,6 +878,15 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
         console.log('Packet length:', actualLength);
         console.log('Current offset:', currentOffset);
         console.log('End offset:', endOffset);
+        
+        console.log('=== PARSE MAIN PACKET END ===');
+        console.log('Final result:', {
+            header: result.header,
+            length: result.length,
+            recordsCount: result.records.length,
+            recordTags: result.records.length > 0 ? Object.keys(result.records[0].tags) : [],
+            lastIMEI: lastIMEI
+        });
 
         return result;
     } catch (error) {
@@ -875,31 +912,47 @@ async function parsePacket(buffer) {
             throw new Error('Input must be a buffer');
         }
 
+        console.log('=== PACKET PARSING START ===');
         console.log('Raw packet data:', buffer.toString('hex'));
+        console.log('Buffer length:', buffer.length);
 
         if (buffer.length < 3) {
             throw new Error('Packet too short');
         }
 
         const header = buffer.readUInt8(0);
+        console.log('Packet header:', `0x${header.toString(16).padStart(2, '0')}`);
         
         // Validate packet structure and checksum
         const { hasUnsentData, actualLength, rawLength } = validatePacket(buffer);
+        console.log('Packet validation result:', { hasUnsentData, actualLength, rawLength });
         
         // Use PacketTypeHandler to determine packet type
         if (PacketTypeHandler.isMainPacket(header)) {
+            console.log('Processing as MAIN PACKET');
             // This is a Head Packet or Main Packet
             const result = await parseMainPacket(buffer, 0, actualLength);
             result.hasUnsentData = hasUnsentData;
             result.actualLength = actualLength;
             result.rawLength = rawLength;
+            console.log('Main packet parsing result:', {
+                header: result.header,
+                length: result.length,
+                recordsCount: result.records ? result.records.length : 0,
+                hasUnsentData: result.hasUnsentData
+            });
+            console.log('=== PACKET PARSING END ===');
             return result;
         } else if (PacketTypeHandler.isIgnorablePacket(header)) {
+            console.log('Processing as IGNORABLE PACKET');
             // This is an ignorable packet, just needs confirmation
-            return await parseIgnorablePacket(buffer);
+            const result = await parseIgnorablePacket(buffer);
+            console.log('=== PACKET PARSING END ===');
+            return result;
         } else {
+            console.log('Processing as EXTENSION PACKET');
             // This is an extension packet
-            return {
+            const result = {
                 type: 'extension',
                 header: header,
                 length: buffer.readUInt16LE(1),
@@ -908,16 +961,30 @@ async function parsePacket(buffer) {
                 rawLength,
                 raw: buffer
             };
+            console.log('=== PACKET PARSING END ===');
+            return result;
         }
     } catch (error) {
         console.error('Parsing error:', error);
+        console.log('=== PACKET PARSING END (ERROR) ===');
         throw error;
     }
 }
 
 // Add parsed data to storage
 function addParsedData(data) {
-    if (!data || typeof data !== 'object') return;
+    console.log('=== ADD PARSED DATA START ===');
+    console.log('Input data:', {
+        type: typeof data,
+        hasRecords: data && data.records,
+        recordsCount: data && data.records ? data.records.length : 0,
+        header: data && data.header ? `0x${data.header.toString(16).padStart(2, '0')}` : 'unknown'
+    });
+    
+    if (!data || typeof data !== 'object') {
+        console.log('Invalid data, returning');
+        return;
+    }
     
     // If this is a main packet with records, extract data from the first record
     if (data.records && data.records.length > 0) {
@@ -1120,6 +1187,8 @@ function addParsedData(data) {
         
         logger.info(`Added data for device: ${simpleData.deviceId || 'unknown'}`);
     }
+    
+    console.log('=== ADD PARSED DATA END ===');
 }
 
 // Get latest data
