@@ -220,13 +220,31 @@ async function parseExtendedTags(buffer, offset) {
     const result = {};
     let currentOffset = offset;
     
+    // Check if we have enough bytes for the length field
+    if (currentOffset + 2 > buffer.length) {
+        console.warn('parseExtendedTags: Not enough bytes for length field');
+        return [result, currentOffset];
+    }
+    
     // Read the length of extended tags block (2 bytes)
     const length = buffer.readUInt16LE(currentOffset);
     currentOffset += 2;
     
     const endOffset = currentOffset + length;
     
+    // Check if the calculated end offset is within buffer bounds
+    if (endOffset > buffer.length) {
+        console.warn(`parseExtendedTags: Length ${length} would exceed buffer bounds (${buffer.length - currentOffset} bytes available)`);
+        endOffset = buffer.length;
+    }
+    
     while (currentOffset < endOffset) {
+        // Check if we have enough bytes for the tag
+        if (currentOffset + 2 > buffer.length) {
+            console.warn('parseExtendedTags: Not enough bytes for tag');
+            break;
+        }
+        
         // Extended tags are 2 bytes each
         const tag = buffer.readUInt16LE(currentOffset);
         currentOffset += 2;
@@ -237,12 +255,50 @@ async function parseExtendedTags(buffer, offset) {
 
         if (!definition) {
             console.warn(`Unknown extended tag: ${tagHex}`);
-            // Skip 4 bytes for unknown extended tags
-            currentOffset += 4;
+            // Skip 4 bytes for unknown extended tags, but check bounds
+            if (currentOffset + 4 <= buffer.length) {
+                currentOffset += 4;
+            } else {
+                console.warn('parseExtendedTags: Not enough bytes for unknown tag value');
+                break;
+            }
             continue;
         }
 
         let value;
+        let bytesToRead = 0;
+        
+        // Determine how many bytes we need to read
+        switch (definition.type) {
+            case 'uint8':
+                bytesToRead = 1;
+                break;
+            case 'uint16':
+                bytesToRead = 2;
+                break;
+            case 'uint32':
+            case 'uint32_modbus':
+                bytesToRead = 4;
+                break;
+            case 'int8':
+                bytesToRead = 1;
+                break;
+            case 'int16':
+                bytesToRead = 2;
+                break;
+            case 'int32':
+                bytesToRead = 4;
+                break;
+            default:
+                bytesToRead = 4; // Default to 4 bytes
+        }
+        
+        // Check if we have enough bytes to read the value
+        if (currentOffset + bytesToRead > buffer.length) {
+            console.warn(`parseExtendedTags: Not enough bytes for ${definition.type} value (need ${bytesToRead}, have ${buffer.length - currentOffset})`);
+            break;
+        }
+        
         switch (definition.type) {
             case 'uint8':
                 value = buffer.readUInt8(currentOffset);
@@ -307,6 +363,12 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
             let recordOffset = currentOffset;
 
             while (recordOffset < endOffset - 2) {
+                // Check if we have enough bytes for the tag
+                if (recordOffset >= endOffset - 2) {
+                    console.warn('Not enough bytes for tag');
+                    break;
+                }
+                
                 const tag = buffer.readUInt8(recordOffset);
                 recordOffset++;
 
@@ -325,6 +387,45 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 if (!definition) {
                     console.warn(`Unknown tag: ${tagHex}`);
                     continue;
+                }
+
+                // Determine how many bytes we need to read
+                let bytesToRead = 0;
+                switch (definition.type) {
+                    case 'uint8':
+                    case 'int8':
+                        bytesToRead = 1;
+                        break;
+                    case 'uint16':
+                    case 'int16':
+                    case 'status':
+                    case 'outputs':
+                    case 'inputs':
+                        bytesToRead = 2;
+                        break;
+                    case 'uint32':
+                    case 'uint32_modbus':
+                    case 'int32':
+                    case 'datetime':
+                        bytesToRead = 4;
+                        break;
+                    case 'string':
+                        bytesToRead = definition.length || 1;
+                        break;
+                    case 'coordinates':
+                        bytesToRead = 9; // 1 byte for satellites/correctness + 4 for lat + 4 for lon
+                        break;
+                    case 'speedDirection':
+                        bytesToRead = 4; // 2 for speed + 2 for direction
+                        break;
+                    default:
+                        bytesToRead = definition.length || 1;
+                }
+                
+                // Check if we have enough bytes to read the value
+                if (recordOffset + bytesToRead > endOffset - 2) {
+                    console.warn(`Not enough bytes for ${definition.type} value (need ${bytesToRead}, have ${endOffset - 2 - recordOffset})`);
+                    break;
                 }
 
                 let value;
@@ -490,6 +591,12 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 let recordOffset = 0;
                 
                 while (recordOffset < recordBuffer.length) {
+                    // Check if we have enough bytes for the tag
+                    if (recordOffset >= recordBuffer.length) {
+                        console.warn('Not enough bytes for tag');
+                        break;
+                    }
+                    
                     const tag = recordBuffer.readUInt8(recordOffset);
                     recordOffset++;
                     
@@ -508,6 +615,45 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     if (!definition) {
                         console.warn(`Unknown tag: ${tagHex}`);
                         continue;
+                    }
+                    
+                    // Determine how many bytes we need to read
+                    let bytesToRead = 0;
+                    switch (definition.type) {
+                        case 'uint8':
+                        case 'int8':
+                            bytesToRead = 1;
+                            break;
+                        case 'uint16':
+                        case 'int16':
+                        case 'status':
+                        case 'outputs':
+                        case 'inputs':
+                            bytesToRead = 2;
+                            break;
+                        case 'uint32':
+                        case 'uint32_modbus':
+                        case 'int32':
+                        case 'datetime':
+                            bytesToRead = 4;
+                            break;
+                        case 'string':
+                            bytesToRead = definition.length || 1;
+                            break;
+                        case 'coordinates':
+                            bytesToRead = 9; // 1 byte for satellites/correctness + 4 for lat + 4 for lon
+                            break;
+                        case 'speedDirection':
+                            bytesToRead = 4; // 2 for speed + 2 for direction
+                            break;
+                        default:
+                            bytesToRead = definition.length || 1;
+                    }
+                    
+                    // Check if we have enough bytes to read the value
+                    if (recordOffset + bytesToRead > recordBuffer.length) {
+                        console.warn(`Not enough bytes for ${definition.type} value (need ${bytesToRead}, have ${recordBuffer.length - recordOffset})`);
+                        break;
                     }
                     
                     let value;
