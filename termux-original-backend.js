@@ -3,9 +3,118 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// Import original parser components
-const tagDefinitions = require('./original/tagDefinitions');
-const TagParser = require('./original/tagParser');
+// Include tag definitions directly
+const tagDefinitions = {
+    // Basic Device Information
+    '0x01': {
+        name: 'Hardware Version',
+        type: 'uint8',
+        length: 1,
+        description: 'Hardware version of the device'
+    },
+    '0x02': {
+        name: 'Firmware Version',
+        type: 'uint8',
+        length: 1,
+        description: 'Firmware version of the device'
+    },
+    '0x03': {
+        name: 'IMEI',
+        type: 'string',
+        length: 15,
+        description: 'IMEI number of the device'
+    },
+    '0x04': {
+        name: 'Device Identifier',
+        type: 'uint16',
+        length: 2,
+        description: 'Identifier of the device'
+    },
+    '0x10': {
+        name: 'Archive Record Number',
+        type: 'uint16',
+        length: 2,
+        description: 'Sequential number of archive record'
+    },
+    '0x20': {
+        name: 'Date Time',
+        type: 'datetime',
+        length: 4,
+        description: 'Date and time in Unix timestamp format'
+    },
+    '0x21': {
+        name: 'Milliseconds',
+        type: 'uint16',
+        length: 2,
+        description: 'Milliseconds (0-999) to complete date and time value'
+    },
+    '0x30': {
+        name: 'Coordinates',
+        type: 'coordinates',
+        length: 9,
+        description: 'GPS/GLONASS coordinates and satellites info'
+    },
+    '0x33': {
+        name: 'Speed and Direction',
+        type: 'speedDirection',
+        length: 4,
+        description: 'Speed in km/h and direction in degrees'
+    },
+    '0x34': {
+        name: 'Height',
+        type: 'int16',
+        length: 2,
+        description: 'Height above sea level in meters'
+    },
+    '0x35': {
+        name: 'HDOP',
+        type: 'uint8',
+        length: 1,
+        description: 'HDOP or cellular location error in meters'
+    },
+    '0x40': {
+        name: 'Status',
+        type: 'status',
+        length: 2,
+        description: 'Device status bits'
+    },
+    '0x41': {
+        name: 'Supply Voltage',
+        type: 'uint16',
+        length: 2,
+        description: 'Supply voltage in mV'
+    },
+    '0x42': {
+        name: 'Battery Voltage',
+        type: 'uint16',
+        length: 2,
+        description: 'Battery voltage in mV'
+    },
+    '0x43': {
+        name: 'Inside Temperature',
+        type: 'int8',
+        length: 1,
+        description: 'Internal temperature in °C'
+    },
+    '0x44': {
+        name: 'Acceleration',
+        type: 'uint32',
+        length: 4,
+        description: 'Acceleration'
+    },
+    '0x45': {
+        name: 'Status of outputs',
+        type: 'outputs',
+        length: 2,
+        description: 'Status of outputs (each bit represents an output state)'
+    },
+    '0x46': {
+        name: 'Status of inputs',
+        type: 'inputs',
+        length: 2,
+        description: 'Status of inputs (each bit represents an input state)'
+    }
+};
 
 class GalileoskyParser {
     constructor() {
