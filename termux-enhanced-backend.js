@@ -1,3 +1,10 @@
+// ========================================
+// GALILEOSKY ENHANCED BACKEND (FIXED VERSION)
+// ========================================
+// This is the ENHANCED backend with proper parsing fixes
+// Last updated: 2025-06-24
+// ========================================
+
 const net = require('net');
 const http = require('http');
 const fs = require('fs');
@@ -6,6 +13,15 @@ const url = require('url');
 const express = require('express');
 const socketIo = require('socket.io');
 const cors = require('cors');
+
+// Clear startup identification
+console.log('🚀 ========================================');
+console.log('🚀 GALILEOSKY ENHANCED BACKEND (FIXED)');
+console.log('🚀 ========================================');
+console.log('🚀 This is the ENHANCED backend with parsing fixes');
+console.log('🚀 Last updated: 2025-06-24');
+console.log('🚀 ========================================');
+console.log('');
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, 'logs');

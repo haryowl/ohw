@@ -1,6 +1,21 @@
+// ========================================
+// GALILEOSKY SIMPLE BACKEND (BASIC VERSION)
+// ========================================
+// This is the SIMPLE backend with basic parsing
+// Does NOT have the enhanced parsing fixes
+// ========================================
+
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
+
+// Clear startup identification
+console.log('📱 ========================================');
+console.log('📱 GALILEOSKY SIMPLE BACKEND (BASIC)');
+console.log('📱 ========================================');
+console.log('📱 This is the SIMPLE backend - NO parsing fixes');
+console.log('📱 ========================================');
+console.log('');
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, 'logs');
