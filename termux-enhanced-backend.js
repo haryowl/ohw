@@ -215,7 +215,7 @@ function validatePacket(buffer) {
     };
 }
 
-// Parse extended tags (0xFE) - following parser.js exactly
+// Parse extended tags (simplified from original working parser)
 async function parseExtendedTags(buffer, offset) {
     const result = {};
     let currentOffset = offset;
@@ -288,7 +288,7 @@ async function parseExtendedTags(buffer, offset) {
     return [result, currentOffset];
 }
 
-// Parse main packet following parser.js implementation
+// Parse main packet (adapted from original working parser)
 async function parseMainPacket(buffer, offset = 0, actualLength) {
     try {
         const result = {
@@ -433,70 +433,55 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
             if (Object.keys(record.tags).length > 0) {
                 result.records.push(record);
-                console.log('Extracted tags:', Object.keys(record.tags));
-                console.log('Sample tag data:', record.tags);
+                console.log('Record extracted tags:', Object.keys(record.tags));
             }
         } else {
             // For packets >= 32 bytes, handle multiple records properly
             // Records are separated by 0x00 and start with 0x10 or 0x20
             console.log('Processing large packet for multiple records');
             
-            let currentOffset = offset + 3;
-            const endOffset = offset + actualLength;
+            // Count records by looking for 0x10 tags
+            let recordCount = 0;
+            let searchOffset = currentOffset;
+            while (searchOffset < endOffset - 2) {
+                if (buffer.readUInt8(searchOffset) === 0x10) {
+                    recordCount++;
+                }
+                searchOffset++;
+            }
             
-            // Split the buffer into individual records using 0x00 as separator
-            const records = [];
-            let recordStart = currentOffset;
-            let i = currentOffset;
+            console.log(`Found ${recordCount} records in packet`);
             
-            while (i < endOffset - 2) {
-                const byte = buffer.readUInt8(i);
+            // Parse each record
+            let recordIndex = 0;
+            while (currentOffset < endOffset - 2 && recordIndex < recordCount) {
+                // Find next 0x10 tag
+                while (currentOffset < endOffset - 2 && buffer.readUInt8(currentOffset) !== 0x10) {
+                    currentOffset++;
+                }
                 
-                // Check if this is a record separator (0x00) followed by record start (0x10 or 0x20)
-                if (byte === 0x00 && i + 1 < endOffset - 2) {
-                    const nextByte = buffer.readUInt8(i + 1);
-                    if (nextByte === 0x10 || nextByte === 0x20) {
-                        // End of current record, start of new record
-                        if (i > recordStart) {
-                            const recordBuffer = buffer.slice(recordStart, i);
-                            if (recordBuffer.length > 0) {
-                                records.push(recordBuffer);
-                            }
-                        }
-                        recordStart = i + 1; // Start after the 0x00
-                        i += 2; // Skip both 0x00 and the record start byte
-                        continue;
-                    }
-                }
-                i++;
-            }
-            
-            // Add the last record if there's remaining data
-            if (recordStart < endOffset - 2) {
-                const recordBuffer = buffer.slice(recordStart, endOffset - 2);
-                if (recordBuffer.length > 0) {
-                    records.push(recordBuffer);
-                }
-            }
-            
-            console.log(`Found ${records.length} records in packet`);
-            
-            // Parse each record individually
-            for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
-                const recordBuffer = records[recordIndex];
-                console.log(`Parsing record ${recordIndex + 1}/${records.length}, length: ${recordBuffer.length}`);
+                if (currentOffset >= endOffset - 2) break;
                 
                 const record = { tags: {} };
-                let recordOffset = 0;
+                let recordOffset = currentOffset;
+                recordIndex++;
                 
-                while (recordOffset < recordBuffer.length) {
-                    const tag = recordBuffer.readUInt8(recordOffset);
+                console.log(`Parsing record ${recordIndex}/${recordCount}, length: ${endOffset - recordOffset}`);
+                
+                while (recordOffset < endOffset - 2) {
+                    const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
                     
                     console.log('Found tag:', `0x${tag.toString(16).padStart(2, '0')}`);
                     
+                    // Check if we've reached the next record
+                    if (tag === 0x10 && recordOffset > currentOffset + 1) {
+                        recordOffset--;
+                        break;
+                    }
+                    
                     if (tag === 0xFE) {
-                        const [extendedTags, newOffset] = await parseExtendedTags(recordBuffer, recordOffset);
+                        const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
                         Object.assign(record.tags, extendedTags);
                         recordOffset = newOffset;
                         continue;
@@ -513,57 +498,57 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     let value;
                     switch (definition.type) {
                         case 'uint8':
-                            value = recordBuffer.readUInt8(recordOffset);
+                            value = buffer.readUInt8(recordOffset);
                             recordOffset += 1;
                             break;
                         case 'uint16':
-                            value = recordBuffer.readUInt16LE(recordOffset);
+                            value = buffer.readUInt16LE(recordOffset);
                             recordOffset += 2;
                             break;
                         case 'uint32':
-                            value = recordBuffer.readUInt32LE(recordOffset);
+                            value = buffer.readUInt32LE(recordOffset);
                             recordOffset += 4;
                             break;
                         case 'uint32_modbus':
-                            value = recordBuffer.readUInt32LE(recordOffset)/100;
+                            value = buffer.readUInt32LE(recordOffset)/100;
                             recordOffset += 4;
                             break;
                         case 'int8':
-                            value = recordBuffer.readInt8(recordOffset);
+                            value = buffer.readInt8(recordOffset);
                             recordOffset += 1;
                             break;
                         case 'int16':
-                            value = recordBuffer.readInt16LE(recordOffset);
+                            value = buffer.readInt16LE(recordOffset);
                             recordOffset += 2;
                             break;
                         case 'int32':
-                            value = recordBuffer.readInt32LE(recordOffset);
+                            value = buffer.readInt32LE(recordOffset);
                             recordOffset += 4;
                             break;
                         case 'string':
-                            value = recordBuffer.toString('utf8', recordOffset, recordOffset + definition.length);
+                            value = buffer.toString('utf8', recordOffset, recordOffset + definition.length);
                             recordOffset += definition.length;
                             break;
                         case 'datetime':
-                            value = new Date(recordBuffer.readUInt32LE(recordOffset) * 1000);
+                            value = new Date(buffer.readUInt32LE(recordOffset) * 1000);
                             recordOffset += 4;
                             break;
                         case 'coordinates':
-                            const satellites = recordBuffer.readUInt8(recordOffset) & 0x0F;
-                            const correctness = (recordBuffer.readUInt8(recordOffset) >> 4) & 0x0F;
+                            const satellites = buffer.readUInt8(recordOffset) & 0x0F;
+                            const correctness = (buffer.readUInt8(recordOffset) >> 4) & 0x0F;
                             recordOffset++;
-                            const lat = recordBuffer.readInt32LE(recordOffset) / 1000000;
+                            const lat = buffer.readInt32LE(recordOffset) / 1000000;
                             recordOffset += 4;
-                            const lon = recordBuffer.readInt32LE(recordOffset) / 1000000;
+                            const lon = buffer.readInt32LE(recordOffset) / 1000000;
                             recordOffset += 4;
                             value = { latitude: lat, longitude: lon, satellites, correctness };
                             break;
                         case 'status':
-                            value = recordBuffer.readUInt16LE(recordOffset);
+                            value = buffer.readUInt16LE(recordOffset);
                             recordOffset += 2;
                             break;
                         case 'outputs':
-                            const outputsValue = recordBuffer.readUInt16LE(recordOffset);
+                            const outputsValue = buffer.readUInt16LE(recordOffset);
                             const outputsBinary = outputsValue.toString(2).padStart(16, '0');
                             value = {
                                 raw: outputsValue,
@@ -576,7 +561,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                             recordOffset += 2;
                             break;
                         case 'inputs':
-                            const inputsValue = recordBuffer.readUInt16LE(recordOffset);
+                            const inputsValue = buffer.readUInt16LE(recordOffset);
                             const inputsBinary = inputsValue.toString(2).padStart(16, '0');
                             value = {
                                 raw: inputsValue,
@@ -589,8 +574,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                             recordOffset += 2;
                             break;
                         case 'speedDirection':
-                            const speedValue = recordBuffer.readUInt16LE(recordOffset);
-                            const directionValue = recordBuffer.readUInt16LE(recordOffset + 2);
+                            const speedValue = buffer.readUInt16LE(recordOffset);
+                            const directionValue = buffer.readUInt16LE(recordOffset + 2);
                             value = {
                                 speed: speedValue / 10,
                                 direction: directionValue / 10
@@ -616,15 +601,12 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
-                    console.log(`Record ${recordIndex + 1} extracted tags:`, Object.keys(record.tags));
+                    console.log(`Record ${recordIndex} extracted tags:`, Object.keys(record.tags));
                 }
+                
+                currentOffset = recordOffset;
             }
         }
-
-        console.log('Raw packet data:', buffer.toString('hex'));
-        console.log('Packet length:', actualLength);
-        console.log('Current offset:', currentOffset);
-        console.log('End offset:', endOffset);
 
         return result;
     } catch (error) {
