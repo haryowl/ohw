@@ -169,7 +169,7 @@ class GalileoskyParser extends EventEmitter {
                         case 'uint8':
                             value = buffer.readUInt8(recordOffset);
                             recordOffset += 1;
-                    break;
+                            break;
                         case 'uint16':
                             value = buffer.readUInt16LE(recordOffset);
                             recordOffset += 2;
@@ -300,25 +300,44 @@ class GalileoskyParser extends EventEmitter {
                 });
 
                 if (hasMultipleRecords) {
-                    // Multiple records - look for 0x10 tags
-                    while (currentOffset < endOffset - 2) {
-                        if (buffer.readUInt8(currentOffset) !== 0x10) {
-                            currentOffset++;
-                        continue;
-                    }
-
+                    // Multiple records - parse each record starting with 0x10 tag
+                    logger.info('Processing large packet for multiple records');
+                    
+                    let recordCount = 0;
+                    let currentRecordStart = currentOffset;
+                    
+                    while (currentRecordStart < endOffset - 2) {
+                        // Find the next 0x10 tag (start of a new record)
+                        let recordStart = currentRecordStart;
+                        while (recordStart < endOffset - 2 && buffer.readUInt8(recordStart) !== 0x10) {
+                            recordStart++;
+                        }
+                        
+                        if (recordStart >= endOffset - 2) {
+                            break; // No more records
+                        }
+                        
+                        recordCount++;
+                        logger.info(`Parsing record ${recordCount}, length: ${endOffset - recordStart}`);
+                        
                         const record = { tags: {} };
-                        let recordOffset = currentOffset;
-
-                        while (recordOffset < endOffset - 2) {
+                        let recordOffset = recordStart;
+                        const recordEnd = endOffset;
+                        
+                        // Parse tags for this record
+                        while (recordOffset < recordEnd - 2) {
                             const tag = buffer.readUInt8(recordOffset);
                             recordOffset++;
-
-                            if (tag === 0x10 && recordOffset > currentOffset + 1) {
+                            
+                            // Check if we've reached the start of the next record
+                            if (tag === 0x10 && recordOffset > recordStart + 1) {
+                                // This is the start of the next record, stop parsing current record
                                 recordOffset--;
                                 break;
                             }
-
+                            
+                            logger.info(`Found tag: 0x${tag.toString(16).padStart(2, '0')}`);
+                            
                             if (tag === 0xFE) {
                                 const [extendedTags, newOffset] = await this.parseExtendedTags(buffer, recordOffset);
                                 Object.assign(record.tags, extendedTags);
@@ -442,6 +461,10 @@ class GalileoskyParser extends EventEmitter {
                             }
                         }
 
+                        // Log extracted tags for debugging
+                        const extractedTags = Object.keys(record.tags);
+                        logger.info(`Record ${recordCount} extracted tags: [${extractedTags.join(', ')}]`);
+
                         if (Object.keys(record.tags).length > 0) {
                             result.records.push(record);
                             if (this.lastIMEI) {
@@ -449,8 +472,11 @@ class GalileoskyParser extends EventEmitter {
                             }
                         }
 
-                        currentOffset = recordOffset;
+                        // Move to next record start position
+                        currentRecordStart = recordOffset;
                     }
+                    
+                    logger.info(`Found ${recordCount} records in packet`);
                 } else {
                     // Single record - parse directly from currentOffset
                     logger.info('Processing single record packet');
