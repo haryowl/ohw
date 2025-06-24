@@ -220,13 +220,31 @@ async function parseExtendedTags(buffer, offset) {
     const result = {};
     let currentOffset = offset;
     
+    // Check if we have enough bytes for the length field
+    if (currentOffset + 2 > buffer.length) {
+        console.warn('Not enough bytes for extended tags length');
+        return [result, currentOffset];
+    }
+    
     // Read the length of extended tags block (2 bytes)
     const length = buffer.readUInt16LE(currentOffset);
     currentOffset += 2;
     
     const endOffset = currentOffset + length;
     
+    // Check if the calculated end offset is within bounds
+    if (endOffset > buffer.length) {
+        console.warn(`Extended tags length ${length} would exceed buffer bounds. Available: ${buffer.length - currentOffset}`);
+        return [result, currentOffset];
+    }
+    
     while (currentOffset < endOffset) {
+        // Check if we have enough bytes for the tag
+        if (currentOffset + 2 > endOffset) {
+            console.warn('Not enough bytes for extended tag');
+            break;
+        }
+        
         // Extended tags are 2 bytes each
         const tag = buffer.readUInt16LE(currentOffset);
         currentOffset += 2;
@@ -237,44 +255,89 @@ async function parseExtendedTags(buffer, offset) {
 
         if (!definition) {
             console.warn(`Unknown extended tag: ${tagHex}`);
-            // Skip 4 bytes for unknown extended tags
-            currentOffset += 4;
+            // Skip 4 bytes for unknown extended tags, but check bounds
+            if (currentOffset + 4 <= endOffset) {
+                currentOffset += 4;
+            } else {
+                console.warn('Not enough bytes for unknown extended tag value');
+                break;
+            }
             continue;
         }
 
         let value;
         switch (definition.type) {
             case 'uint8':
-                value = buffer.readUInt8(currentOffset);
-                currentOffset += 1;
+                if (currentOffset + 1 <= endOffset) {
+                    value = buffer.readUInt8(currentOffset);
+                    currentOffset += 1;
+                } else {
+                    console.warn('Not enough bytes for uint8 value');
+                    break;
+                }
                 break;
             case 'uint16':
-                value = buffer.readUInt16LE(currentOffset);
-                currentOffset += 2;
+                if (currentOffset + 2 <= endOffset) {
+                    value = buffer.readUInt16LE(currentOffset);
+                    currentOffset += 2;
+                } else {
+                    console.warn('Not enough bytes for uint16 value');
+                    break;
+                }
                 break;
             case 'uint32':
-                value = buffer.readUInt32LE(currentOffset);
-                currentOffset += 4;
+                if (currentOffset + 4 <= endOffset) {
+                    value = buffer.readUInt32LE(currentOffset);
+                    currentOffset += 4;
+                } else {
+                    console.warn('Not enough bytes for uint32 value');
+                    break;
+                }
                 break;
             case 'uint32_modbus':
-                value = buffer.readUInt32LE(currentOffset)/100;
-                currentOffset += 4;
+                if (currentOffset + 4 <= endOffset) {
+                    value = buffer.readUInt32LE(currentOffset)/100;
+                    currentOffset += 4;
+                } else {
+                    console.warn('Not enough bytes for uint32_modbus value');
+                    break;
+                }
                 break;
             case 'int8':
-                value = buffer.readInt8(currentOffset);
-                currentOffset += 1;
+                if (currentOffset + 1 <= endOffset) {
+                    value = buffer.readInt8(currentOffset);
+                    currentOffset += 1;
+                } else {
+                    console.warn('Not enough bytes for int8 value');
+                    break;
+                }
                 break;
             case 'int16':
-                value = buffer.readInt16LE(currentOffset);
-                currentOffset += 2;
+                if (currentOffset + 2 <= endOffset) {
+                    value = buffer.readInt16LE(currentOffset);
+                    currentOffset += 2;
+                } else {
+                    console.warn('Not enough bytes for int16 value');
+                    break;
+                }
                 break;
             case 'int32':
-                value = buffer.readInt32LE(currentOffset);
-                currentOffset += 4;
+                if (currentOffset + 4 <= endOffset) {
+                    value = buffer.readInt32LE(currentOffset);
+                    currentOffset += 4;
+                } else {
+                    console.warn('Not enough bytes for int32 value');
+                    break;
+                }
                 break;
             default:
                 console.warn(`Unsupported extended tag type: ${definition.type}`);
-                currentOffset += 4; // Default to 4 bytes
+                if (currentOffset + 4 <= endOffset) {
+                    currentOffset += 4; // Default to 4 bytes
+                } else {
+                    console.warn('Not enough bytes for default extended tag value');
+                    break;
+                }
                 value = null;
         }
 
@@ -436,49 +499,37 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 console.log('Record extracted tags:', Object.keys(record.tags));
             }
         } else {
-            // For packets >= 32 bytes, handle multiple records properly
-            // Records are separated by 0x00 and start with 0x10 or 0x20
-            console.log('Processing large packet for multiple records');
+            // Multiple records packet - find record boundaries using 0x10 tags
+            console.log('Processing multiple records packet');
             
-            // Count records by looking for 0x10 tags
-            let recordCount = 0;
+            // Find all record start positions (0x10 tags)
+            const recordStarts = [];
             let searchOffset = currentOffset;
+            
             while (searchOffset < endOffset - 2) {
                 if (buffer.readUInt8(searchOffset) === 0x10) {
-                    recordCount++;
+                    recordStarts.push(searchOffset);
                 }
                 searchOffset++;
             }
             
-            console.log(`Found ${recordCount} records in packet`);
+            console.log(`Found ${recordStarts.length} record start positions`);
             
             // Parse each record
-            let recordIndex = 0;
-            while (currentOffset < endOffset - 2 && recordIndex < recordCount) {
-                // Find next 0x10 tag
-                while (currentOffset < endOffset - 2 && buffer.readUInt8(currentOffset) !== 0x10) {
-                    currentOffset++;
-                }
+            for (let i = 0; i < recordStarts.length; i++) {
+                const recordStart = recordStarts[i];
+                const recordEnd = (i < recordStarts.length - 1) ? recordStarts[i + 1] : endOffset;
                 
-                if (currentOffset >= endOffset - 2) break;
+                console.log(`Parsing record ${i + 1}/${recordStarts.length}, start: ${recordStart}, end: ${recordEnd}`);
                 
                 const record = { tags: {} };
-                let recordOffset = currentOffset;
-                recordIndex++;
+                let recordOffset = recordStart;
                 
-                console.log(`Parsing record ${recordIndex}/${recordCount}, length: ${endOffset - recordOffset}`);
-                
-                while (recordOffset < endOffset - 2) {
+                while (recordOffset < recordEnd && recordOffset < endOffset - 2) {
                     const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
                     
                     console.log('Found tag:', `0x${tag.toString(16).padStart(2, '0')}`);
-                    
-                    // Check if we've reached the next record
-                    if (tag === 0x10 && recordOffset > currentOffset + 1) {
-                        recordOffset--;
-                        break;
-                    }
                     
                     if (tag === 0xFE) {
                         const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
@@ -555,8 +606,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                                 binary: outputsBinary,
                                 states: {}
                             };
-                            for (let i = 0; i < 16; i++) {
-                                value.states[`output${i}`] = outputsBinary[15 - i] === '1';
+                            for (let j = 0; j < 16; j++) {
+                                value.states[`output${j}`] = outputsBinary[15 - j] === '1';
                             }
                             recordOffset += 2;
                             break;
@@ -568,8 +619,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                                 binary: inputsBinary,
                                 states: {}
                             };
-                            for (let i = 0; i < 16; i++) {
-                                value.states[`input${i}`] = inputsBinary[15 - i] === '1';
+                            for (let j = 0; j < 16; j++) {
+                                value.states[`input${j}`] = inputsBinary[15 - j] === '1';
                             }
                             recordOffset += 2;
                             break;
@@ -601,10 +652,8 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
-                    console.log(`Record ${recordIndex} extracted tags:`, Object.keys(record.tags));
+                    console.log(`Record ${i + 1} extracted tags:`, Object.keys(record.tags));
                 }
-                
-                currentOffset = recordOffset;
             }
         }
 
