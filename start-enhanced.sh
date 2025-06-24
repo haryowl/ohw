@@ -15,6 +15,11 @@ if [ ! -f "termux-enhanced-backend.js" ]; then
     exit 1
 fi
 
+# Debug: Show which file we're about to run
+echo "🔍 Debug: About to run: $(pwd)/termux-enhanced-backend.js"
+echo "🔍 Debug: File exists: $(ls -la termux-enhanced-backend.js)"
+echo "🔍 Debug: File size: $(wc -c < termux-enhanced-backend.js) bytes"
+
 # Get the device IP address - try multiple methods for Android/Termux compatibility
 DEVICE_IP=""
 if command -v ip &> /dev/null; then
@@ -52,5 +57,5 @@ echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-# Run the enhanced backend
-node termux-enhanced-backend.js 
+# Run the enhanced backend with explicit path
+node "$(pwd)/termux-enhanced-backend.js" 
