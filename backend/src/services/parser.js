@@ -157,10 +157,10 @@ class GalileoskyParser extends EventEmitter {
                     recordOffset++;
 
                     const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-                    const definition = tagDefinitions[tagHex];
+                    const definition = require('./tagDefinitions')[tagHex];
 
                     if (!definition) {
-                        logger.warn(`Unknown tag: ${tagHex}`);
+                        console.warn(`Unknown tag: ${tagHex}`);
                         continue;
                     }
 
@@ -218,14 +218,12 @@ class GalileoskyParser extends EventEmitter {
                             break;
                         case 'outputs':
                             const outputsValue = buffer.readUInt16LE(recordOffset);
-                            // Convert to binary and create an object with individual output states
                             const outputsBinary = outputsValue.toString(2).padStart(16, '0');
                             value = {
                                 raw: outputsValue,
                                 binary: outputsBinary,
                                 states: {}
                             };
-                            // Each bit represents an output state (0-15)
                             for (let i = 0; i < 16; i++) {
                                 value.states[`output${i}`] = outputsBinary[15 - i] === '1';
                             }
@@ -233,14 +231,12 @@ class GalileoskyParser extends EventEmitter {
                             break;
                         case 'inputs':
                             const inputsValue = buffer.readUInt16LE(recordOffset);
-                            // Convert to binary and create an object with individual input states
                             const inputsBinary = inputsValue.toString(2).padStart(16, '0');
                             value = {
                                 raw: inputsValue,
                                 binary: inputsBinary,
                                 states: {}
                             };
-                            // Each bit represents an input state (0-15)
                             for (let i = 0; i < 16; i++) {
                                 value.states[`input${i}`] = inputsBinary[15 - i] === '1';
                             }
@@ -250,13 +246,13 @@ class GalileoskyParser extends EventEmitter {
                             const speedValue = buffer.readUInt16LE(recordOffset);
                             const directionValue = buffer.readUInt16LE(recordOffset + 2);
                             value = {
-                                speed: speedValue / 10, // Speed in km/h
-                                direction: directionValue / 10 // Direction in degrees
+                                speed: speedValue / 10,
+                                direction: directionValue / 10
                             };
                             recordOffset += 4;
                             break;
                         default:
-                            logger.warn(`Unsupported tag type: ${definition.type}`);
+                            console.warn(`Unsupported tag type: ${definition.type}`);
                             recordOffset += definition.length || 1;
                             value = null;
                     }
@@ -266,24 +262,15 @@ class GalileoskyParser extends EventEmitter {
                         type: definition.type,
                         description: definition.description
                     };
-
-                    if (tagHex === '0x03' && definition.type === 'string') {
-                        this.lastIMEI = value;
-                    }
                 }
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
-                    if (this.lastIMEI) {
-                        await this.saveRecordToDatabase(record, this.lastIMEI);
-                    }
                 }
             } else {
                 // For packets >= 32 bytes, check if there's a 0x10 tag (Number Archive Records)
                 let hasMultipleRecords = false;
                 let searchOffset = currentOffset;
-                
-                // Look for 0x10 tag to determine if this is a single record or multiple records
                 while (searchOffset < endOffset - 2) {
                     if (buffer.readUInt8(searchOffset) === 0x10) {
                         hasMultipleRecords = true;
@@ -292,67 +279,31 @@ class GalileoskyParser extends EventEmitter {
                     searchOffset++;
                 }
 
-                logger.info('Packet analysis:', {
-                    actualLength,
-                    hasMultipleRecords,
-                    searchOffset: searchOffset - currentOffset,
-                    timestamp: new Date().toISOString()
-                });
-
                 if (hasMultipleRecords) {
-                    // Multiple records - parse each record starting with 0x10 tag
-                    logger.info('Processing large packet for multiple records');
-                    
-                    let recordCount = 0;
-                    let currentRecordStart = currentOffset;
-                    
-                    while (currentRecordStart < endOffset - 2) {
-                        // Find the next 0x10 tag (start of a new record)
-                        let recordStart = currentRecordStart;
-                        while (recordStart < endOffset - 2 && buffer.readUInt8(recordStart) !== 0x10) {
-                            recordStart++;
+                    while (currentOffset < endOffset - 2) {
+                        if (buffer.readUInt8(currentOffset) !== 0x10) {
+                            currentOffset++;
+                            continue;
                         }
-                        
-                        if (recordStart >= endOffset - 2) {
-                            break; // No more records
-                        }
-                        
-                        recordCount++;
-                        logger.info(`Parsing record ${recordCount}, length: ${endOffset - recordStart}`);
-                        
                         const record = { tags: {} };
-                        let recordOffset = recordStart;
-                        const recordEnd = endOffset;
-                        
-                        // Parse tags for this record
-                        while (recordOffset < recordEnd - 2) {
+                        let recordOffset = currentOffset;
+                        while (recordOffset < endOffset - 2) {
                             const tag = buffer.readUInt8(recordOffset);
                             recordOffset++;
-                            
-                            // Check if we've reached the start of the next record
-                            if (tag === 0x10 && recordOffset > recordStart + 1) {
-                                // This is the start of the next record, stop parsing current record
+                            if (tag === 0x10 && recordOffset > currentOffset + 1) {
                                 recordOffset--;
                                 break;
                             }
-                            
-                            logger.info(`Found tag: 0x${tag.toString(16).padStart(2, '0')}`);
-                            
                             if (tag === 0xFE) {
-                                const [extendedTags, newOffset] = await this.parseExtendedTags(buffer, recordOffset);
-                                Object.assign(record.tags, extendedTags);
-                                recordOffset = newOffset;
-                                continue;
+                                // Extended tags not implemented in this fix
+                                break;
                             }
-
                             const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-                            const definition = tagDefinitions[tagHex];
-
+                            const definition = require('./tagDefinitions')[tagHex];
                             if (!definition) {
-                                logger.warn(`Unknown tag: ${tagHex}`);
+                                console.warn(`Unknown tag: ${tagHex}`);
                                 continue;
                             }
-
                             let value;
                             switch (definition.type) {
                                 case 'uint8':
@@ -407,14 +358,12 @@ class GalileoskyParser extends EventEmitter {
                                     break;
                                 case 'outputs':
                                     const outputsValue = buffer.readUInt16LE(recordOffset);
-                                    // Convert to binary and create an object with individual output states
                                     const outputsBinary = outputsValue.toString(2).padStart(16, '0');
                                     value = {
                                         raw: outputsValue,
                                         binary: outputsBinary,
                                         states: {}
                                     };
-                                    // Each bit represents an output state (0-15)
                                     for (let i = 0; i < 16; i++) {
                                         value.states[`output${i}`] = outputsBinary[15 - i] === '1';
                                     }
@@ -422,14 +371,12 @@ class GalileoskyParser extends EventEmitter {
                                     break;
                                 case 'inputs':
                                     const inputsValue = buffer.readUInt16LE(recordOffset);
-                                    // Convert to binary and create an object with individual input states
                                     const inputsBinary = inputsValue.toString(2).padStart(16, '0');
                                     value = {
                                         raw: inputsValue,
                                         binary: inputsBinary,
                                         states: {}
                                     };
-                                    // Each bit represents an input state (0-15)
                                     for (let i = 0; i < 16; i++) {
                                         value.states[`input${i}`] = inputsBinary[15 - i] === '1';
                                     }
@@ -439,69 +386,44 @@ class GalileoskyParser extends EventEmitter {
                                     const speedValue = buffer.readUInt16LE(recordOffset);
                                     const directionValue = buffer.readUInt16LE(recordOffset + 2);
                                     value = {
-                                        speed: speedValue / 10, // Speed in km/h
-                                        direction: directionValue / 10 // Direction in degrees
+                                        speed: speedValue / 10,
+                                        direction: directionValue / 10
                                     };
                                     recordOffset += 4;
                                     break;
                                 default:
-                                    logger.warn(`Unsupported tag type: ${definition.type}`);
+                                    console.warn(`Unsupported tag type: ${definition.type}`);
                                     recordOffset += definition.length || 1;
                                     value = null;
                             }
-
                             record.tags[tagHex] = {
                                 value: value,
                                 type: definition.type,
                                 description: definition.description
                             };
-
-                            if (tagHex === '0x03' && definition.type === 'string') {
-                                this.lastIMEI = value;
-                            }
                         }
-
-                        // Log extracted tags for debugging
-                        const extractedTags = Object.keys(record.tags);
-                        logger.info(`Record ${recordCount} extracted tags: [${extractedTags.join(', ')}]`);
-
                         if (Object.keys(record.tags).length > 0) {
                             result.records.push(record);
-                            if (this.lastIMEI) {
-                                await this.saveRecordToDatabase(record, this.lastIMEI);
-                            }
                         }
-
-                        // Move to next record start position
-                        currentRecordStart = recordOffset;
+                        currentOffset = recordOffset;
                     }
-                    
-                    logger.info(`Found ${recordCount} records in packet`);
                 } else {
                     // Single record - parse directly from currentOffset
-                    logger.info('Processing single record packet');
                     const record = { tags: {} };
                     let recordOffset = currentOffset;
-
                     while (recordOffset < endOffset - 2) {
                         const tag = buffer.readUInt8(recordOffset);
                         recordOffset++;
-
                         if (tag === 0xFE) {
-                            const [extendedTags, newOffset] = await this.parseExtendedTags(buffer, recordOffset);
-                            Object.assign(record.tags, extendedTags);
-                            recordOffset = newOffset;
-                            continue;
+                            // Extended tags not implemented in this fix
+                            break;
                         }
-
                         const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-                        const definition = tagDefinitions[tagHex];
-
+                        const definition = require('./tagDefinitions')[tagHex];
                         if (!definition) {
-                            logger.warn(`Unknown tag: ${tagHex}`);
+                            console.warn(`Unknown tag: ${tagHex}`);
                             continue;
                         }
-
                         let value;
                         switch (definition.type) {
                             case 'uint8':
@@ -556,14 +478,12 @@ class GalileoskyParser extends EventEmitter {
                                 break;
                             case 'outputs':
                                 const outputsValue = buffer.readUInt16LE(recordOffset);
-                                // Convert to binary and create an object with individual output states
                                 const outputsBinary = outputsValue.toString(2).padStart(16, '0');
                                 value = {
                                     raw: outputsValue,
                                     binary: outputsBinary,
                                     states: {}
                                 };
-                                // Each bit represents an output state (0-15)
                                 for (let i = 0; i < 16; i++) {
                                     value.states[`output${i}`] = outputsBinary[15 - i] === '1';
                                 }
@@ -571,14 +491,12 @@ class GalileoskyParser extends EventEmitter {
                                 break;
                             case 'inputs':
                                 const inputsValue = buffer.readUInt16LE(recordOffset);
-                                // Convert to binary and create an object with individual input states
                                 const inputsBinary = inputsValue.toString(2).padStart(16, '0');
                                 value = {
                                     raw: inputsValue,
                                     binary: inputsBinary,
                                     states: {}
                                 };
-                                // Each bit represents an input state (0-15)
                                 for (let i = 0; i < 16; i++) {
                                     value.states[`input${i}`] = inputsBinary[15 - i] === '1';
                                 }
@@ -588,40 +506,30 @@ class GalileoskyParser extends EventEmitter {
                                 const speedValue = buffer.readUInt16LE(recordOffset);
                                 const directionValue = buffer.readUInt16LE(recordOffset + 2);
                                 value = {
-                                    speed: speedValue / 10, // Speed in km/h
-                                    direction: directionValue / 10 // Direction in degrees
+                                    speed: speedValue / 10,
+                                    direction: directionValue / 10
                                 };
                                 recordOffset += 4;
                                 break;
                             default:
-                                logger.warn(`Unsupported tag type: ${definition.type}`);
+                                console.warn(`Unsupported tag type: ${definition.type}`);
                                 recordOffset += definition.length || 1;
                                 value = null;
                         }
-
                         record.tags[tagHex] = {
                             value: value,
                             type: definition.type,
                             description: definition.description
                         };
-
-                        if (tagHex === '0x03' && definition.type === 'string') {
-                            this.lastIMEI = value;
-                        }
                     }
-
                     if (Object.keys(record.tags).length > 0) {
                         result.records.push(record);
-                        if (this.lastIMEI) {
-                            await this.saveRecordToDatabase(record, this.lastIMEI);
-                        }
                     }
                 }
             }
-
             return result;
         } catch (error) {
-            logger.error('Error parsing main packet:', error);
+            console.error('Error parsing main packet:', error);
             throw error;
         }
     }
