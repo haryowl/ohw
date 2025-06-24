@@ -1228,7 +1228,7 @@ function startHTTPServer() {
         }
         
         // Serve static files
-        let filePath = pathname === '/' ? './mobile-frontend.html' : '.' + pathname;
+        let filePath = pathname === '/' ? './simple-frontend.html' : '.' + pathname;
         
         // Security: prevent directory traversal
         if (filePath.includes('..')) {
