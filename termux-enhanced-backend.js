@@ -23,16 +23,101 @@ console.log('🚀 Last updated: 2025-06-24');
 console.log('🚀 ========================================');
 console.log('');
 
-// Ensure logs directory exists
+// Ensure logs and data directories exist
 const logsDir = path.join(__dirname, 'logs');
+const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir);
 }
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir);
+}
+
+// Data storage files
+const PARSED_DATA_FILE = path.join(dataDir, 'parsed_data.json');
+const DEVICES_FILE = path.join(dataDir, 'devices.json');
+const LAST_IMEI_FILE = path.join(dataDir, 'last_imei.json');
 
 // Global variables for IMEI persistence
 let lastIMEI = null;
 let parsedData = [];
 let devices = new Map();
+
+// Data persistence functions
+function saveData() {
+    try {
+        // Save parsed data (keep only last 1000 records to prevent file from getting too large)
+        const dataToSave = parsedData.slice(-1000);
+        fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(dataToSave, null, 2));
+        
+        // Save devices data
+        const devicesData = Object.fromEntries(devices);
+        fs.writeFileSync(DEVICES_FILE, JSON.stringify(devicesData, null, 2));
+        
+        // Save last IMEI
+        if (lastIMEI) {
+            fs.writeFileSync(LAST_IMEI_FILE, JSON.stringify({ lastIMEI }, null, 2));
+        }
+        
+        logger.info(`Data saved: ${dataToSave.length} records, ${devices.size} devices`);
+    } catch (error) {
+        logger.error('Error saving data:', { error: error.message });
+    }
+}
+
+function loadData() {
+    try {
+        // Load parsed data
+        if (fs.existsSync(PARSED_DATA_FILE)) {
+            const data = JSON.parse(fs.readFileSync(PARSED_DATA_FILE, 'utf8'));
+            parsedData = data;
+            logger.info(`Loaded ${parsedData.length} records from storage`);
+        }
+        
+        // Load devices data
+        if (fs.existsSync(DEVICES_FILE)) {
+            const devicesData = JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8'));
+            devices = new Map(Object.entries(devicesData));
+            logger.info(`Loaded ${devices.size} devices from storage`);
+        }
+        
+        // Load last IMEI
+        if (fs.existsSync(LAST_IMEI_FILE)) {
+            const imeiData = JSON.parse(fs.readFileSync(LAST_IMEI_FILE, 'utf8'));
+            lastIMEI = imeiData.lastIMEI;
+            logger.info(`Loaded last IMEI: ${lastIMEI}`);
+        }
+    } catch (error) {
+        logger.error('Error loading data:', { error: error.message });
+        // If loading fails, start with empty data
+        parsedData = [];
+        devices = new Map();
+        lastIMEI = null;
+    }
+}
+
+// Auto-save data every 30 seconds
+let autoSaveInterval = null;
+
+function startAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+    }
+    autoSaveInterval = setInterval(() => {
+        if (parsedData.length > 0 || devices.size > 0) {
+            saveData();
+        }
+    }, 30000); // Save every 30 seconds
+    logger.info('Auto-save enabled (every 30 seconds)');
+}
+
+function stopAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+        logger.info('Auto-save disabled');
+    }
+}
 
 // Configuration
 const config = {
@@ -912,44 +997,29 @@ function addParsedData(data) {
                 longitude: extractedData.longitude,
                 speed: extractedData.speed,
                 voltage: extractedData.voltage,
-                status: extractedData.status
+                temperature: extractedData.temperature,
+                tagCount: Object.keys(tags).length
             });
             
-            logger.info(`Added data for device: ${extractedData.deviceId || 'unknown'} (record ${recordIndex + 1}/${data.records.length})`);
-            
-            // Broadcast to Socket.IO clients
-            io.emit('deviceData', extractedData);
-            io.emit('deviceUpdate', {
-                deviceId: extractedData.deviceId,
-                timestamp: extractedData.timestamp,
-                location: {
-                    latitude: extractedData.latitude,
-                    longitude: extractedData.longitude
-                },
-                speed: extractedData.speed,
-                direction: extractedData.direction,
-                voltage: extractedData.voltage,
-                status: extractedData.status
-            });
+            // Trigger immediate save for important data
+            if (extractedData.latitude && extractedData.longitude) {
+                saveData();
+            }
         }
         
+        // Update latest data for real-time updates
+        if (parsedData.length > 0) {
+            latestData = parsedData[0];
+        }
+        
+        // Emit to connected clients
+        if (io) {
+            io.emit('deviceData', latestData);
+        }
+        
+        console.log(`Successfully processed ${data.records.length} records. Total records: ${parsedData.length}`);
     } else {
-        // Handle other packet types (ignorable, extension, etc.)
-        const simpleData = {
-            timestamp: new Date().toISOString(),
-            deviceId: lastIMEI || data.deviceId || 'unknown',
-            imei: lastIMEI || data.imei,
-            type: data.header ? `0x${data.header.toString(16).padStart(2, '0')}` : 'unknown',
-            rawData: data
-        };
-        
-        parsedData.unshift(simpleData);
-        
-        if (parsedData.length > 1000) {
-            parsedData = parsedData.slice(0, 1000);
-        }
-        
-        logger.info(`Added data for device: ${simpleData.deviceId || 'unknown'}`);
+        console.log('No records found in packet data');
     }
 }
 
@@ -1267,6 +1337,83 @@ function handleAPIRequest(req, res) {
                 }
             });
             return;
+        } else if (pathname === '/api/data/save' && req.method === 'POST') {
+            // Manual save trigger
+            saveData();
+            res.writeHead(200);
+            res.end(JSON.stringify({ 
+                success: true, 
+                message: 'Data saved successfully',
+                records: parsedData.length,
+                devices: devices.size
+            }));
+        } else if (pathname === '/api/data/clear' && req.method === 'POST') {
+            // Clear all data
+            parsedData = [];
+            devices.clear();
+            lastIMEI = null;
+            
+            // Delete storage files
+            try {
+                if (fs.existsSync(PARSED_DATA_FILE)) fs.unlinkSync(PARSED_DATA_FILE);
+                if (fs.existsSync(DEVICES_FILE)) fs.unlinkSync(DEVICES_FILE);
+                if (fs.existsSync(LAST_IMEI_FILE)) fs.unlinkSync(LAST_IMEI_FILE);
+            } catch (error) {
+                logger.error('Error deleting storage files:', { error: error.message });
+            }
+            
+            res.writeHead(200);
+            res.end(JSON.stringify({ 
+                success: true, 
+                message: 'All data cleared successfully'
+            }));
+        } else if (pathname === '/api/data/export' && req.method === 'GET') {
+            // Export data as JSON
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                records: parsedData,
+                devices: Object.fromEntries(devices),
+                lastIMEI: lastIMEI,
+                totalRecords: parsedData.length,
+                totalDevices: devices.size
+            };
+            
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Content-Disposition': `attachment; filename="galileosky_data_${new Date().toISOString().replace(/[:.]/g, '-')}.json"`
+            });
+            res.end(JSON.stringify(exportData, null, 2));
+        } else if (pathname === '/api/data/storage-info' && req.method === 'GET') {
+            // Get storage information
+            const storageInfo = {
+                parsedDataFile: {
+                    exists: fs.existsSync(PARSED_DATA_FILE),
+                    size: fs.existsSync(PARSED_DATA_FILE) ? fs.statSync(PARSED_DATA_FILE).size : 0,
+                    path: PARSED_DATA_FILE
+                },
+                devicesFile: {
+                    exists: fs.existsSync(DEVICES_FILE),
+                    size: fs.existsSync(DEVICES_FILE) ? fs.statSync(DEVICES_FILE).size : 0,
+                    path: DEVICES_FILE
+                },
+                lastImeiFile: {
+                    exists: fs.existsSync(LAST_IMEI_FILE),
+                    size: fs.existsSync(LAST_IMEI_FILE) ? fs.statSync(LAST_IMEI_FILE).size : 0,
+                    path: LAST_IMEI_FILE
+                },
+                memoryData: {
+                    records: parsedData.length,
+                    devices: devices.size,
+                    lastIMEI: lastIMEI
+                },
+                autoSave: {
+                    enabled: autoSaveInterval !== null,
+                    interval: 30000 // 30 seconds
+                }
+            };
+            
+            res.writeHead(200);
+            res.end(JSON.stringify(storageInfo, null, 2));
         } else {
             res.writeHead(404);
             res.end(JSON.stringify({ error: 'API endpoint not found' }));
@@ -1346,6 +1493,11 @@ function startHTTPServer() {
 process.on('SIGINT', () => {
     logger.info('Shutting down servers...');
     
+    // Save data before shutting down
+    logger.info('Saving data before shutdown...');
+    saveData();
+    stopAutoSave();
+    
     // Close all active connections
     for (const [clientAddress, socket] of activeConnections) {
         try {
@@ -1376,10 +1528,21 @@ process.on('SIGINT', () => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
     logger.error('Uncaught exception:', { error: error.message });
+    // Save data before exiting
+    saveData();
     process.exit(1);
 });
 
 // Start both servers
 logger.info('Starting Galileosky Parser (Enhanced Backend)');
+
+// Load existing data on startup
+logger.info('Loading existing data...');
+loadData();
+
+// Start auto-save
+startAutoSave();
+
+// Start servers
 startTCPServer();
 startHTTPServer(); 
