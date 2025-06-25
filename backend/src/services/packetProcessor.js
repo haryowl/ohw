@@ -9,19 +9,12 @@ const deviceMapper = require('./deviceMapper');
 const alertManager = require('./alertManager');
 const parser = require('./parser');
 const { parsePacket } = require('./parser');
-const packetQueue = require('./packetQueue');
 
 class PacketProcessor {
     constructor() {
         this.parser = new GalileoskyParser();
         this.processors = new Map();
         this.initializeProcessors();
-        this.processingStats = {
-            totalProcessed: 0,
-            totalErrors: 0,
-            averageProcessingTime: 0,
-            lastProcessed: null
-        };
     }
 
     initializeProcessors() {
@@ -30,49 +23,22 @@ class PacketProcessor {
         this.processors.set('confirmation', this.processConfirmationPacket.bind(this));
     }
 
-    // Main entry point - now uses queue for async processing
     async processPacket(packet, socket) {
         try {
-            // Add to queue for asynchronous processing
-            const queued = await packetQueue.addPacket(packet, socket, this.processPacketSync.bind(this));
-            
-            if (!queued) {
-                logger.warn('Failed to queue packet - queue may be full');
-                return null;
-            }
-
-            return { queued: true, timestamp: Date.now() };
-        } catch (error) {
-            logger.error('Error queuing packet:', error);
-            return null;
-        }
-    }
-
-    // Synchronous processing (called by queue)
-    async processPacketSync(packet, socket) {
-        const startTime = Date.now();
-        
-        try {
-            // Log raw packet data (with size limit)
-            const packetHex = packet.toString('hex').toUpperCase();
-            const truncatedHex = packetHex.length > 200 ? packetHex.substring(0, 200) + '...' : packetHex;
-            
+            // Log raw packet data
             logger.info('Processing packet:', {
-                hex: truncatedHex,
+                hex: packet.toString('hex').toUpperCase(),
                 length: packet.length,
                 timestamp: new Date().toISOString()
             });
 
-            // Log to CSV (with size check)
-            if (packet.length <= 1024) { // Only log reasonable sized packets
-                csvLogger.logDeviceData(packetHex);
-            }
+            // Log to CSV
+            csvLogger.logDeviceData(packet.toString('hex'));
 
             // Parse the packet first
             const parsedData = parsePacket(packet);
             if (!parsedData) {
                 logger.error('Failed to parse packet');
-                this.processingStats.totalErrors++;
                 return null;
             }
 
@@ -82,62 +48,45 @@ class PacketProcessor {
                 
                 const processedRecords = [];
                 
-                // Process records in batches to avoid memory issues
-                const batchSize = 10;
-                for (let i = 0; i < parsedData.records.length; i += batchSize) {
-                    const batch = parsedData.records.slice(i, i + batchSize);
+                for (let i = 0; i < parsedData.records.length; i++) {
+                    const record = parsedData.records[i];
                     
-                    const batchPromises = batch.map(async (record, batchIndex) => {
-                        const recordIndex = i + batchIndex;
+                    // Extract IMEI from record
+                    const imei = record.tags['0x03']?.value || parsedData.imei;
+                    if (!imei) {
+                        logger.warn(`No IMEI found in record ${i}`);
+                        continue;
+                    }
+
+                    // Register or get device
+                    let device = await deviceManager.getDevice(imei);
+                    if (!device) {
+                        device = await deviceManager.registerDevice(imei);
+                        logger.info('New device registered:', {
+                            imei,
+                            timestamp: new Date().toISOString()
+                        });
+                    } else {
+                        await deviceManager.updateDeviceStatus(imei, 'online');
+                    }
+
+                    // Process the record
+                    const processed = await this.processMainPacket(record, device.id);
+                    if (processed) {
+                        // Map the data according to device configuration
+                        const mapped = await this.mapPacketData(processed, device.id);
                         
-                        // Extract IMEI from record
-                        const imei = record.tags['0x03']?.value || parsedData.imei;
-                        if (!imei) {
-                            logger.warn(`No IMEI found in record ${recordIndex}`);
-                            return null;
-                        }
-
-                        // Register or get device
-                        let device = await deviceManager.getDevice(imei);
-                        if (!device) {
-                            device = await deviceManager.registerDevice(imei);
-                            logger.info('New device registered:', {
-                                imei,
-                                timestamp: new Date().toISOString()
-                            });
-                        } else {
-                            await deviceManager.updateDeviceStatus(imei, 'online');
-                        }
-
-                        // Process the record
-                        const processed = await this.processMainPacket(record, device.id);
-                        if (processed) {
-                            // Map the data according to device configuration
-                            const mapped = await this.mapPacketData(processed, device.id);
-                            
-                            // Save to database
-                            await this.saveToDatabase(mapped, device.id);
-                            
-                            // Check for alerts
-                            await this.checkAlerts(device.id, mapped);
-                            
-                            return mapped;
-                        }
-                        return null;
-                    });
-
-                    // Wait for batch to complete
-                    const batchResults = await Promise.all(batchPromises);
-                    processedRecords.push(...batchResults.filter(r => r !== null));
-                    
-                    // Small delay between batches to prevent blocking
-                    if (i + batchSize < parsedData.records.length) {
-                        await new Promise(resolve => setTimeout(resolve, 1));
+                        // Save to database
+                        await this.saveToDatabase(mapped, device.id);
+                        
+                        // Check for alerts
+                        await this.checkAlerts(device.id, mapped);
+                        
+                        processedRecords.push(mapped);
                     }
                 }
                 
                 logger.info(`Successfully processed ${processedRecords.length} records`);
-                this.updateProcessingStats(startTime);
                 return processedRecords.length > 0 ? processedRecords[0] : null;
             }
 
@@ -145,11 +94,10 @@ class PacketProcessor {
             const imei = parsedData.imei;
             if (!imei) {
                 logger.error('No IMEI found in packet');
-                this.processingStats.totalErrors++;
                 return null;
             }
 
-            // Log specific device parameters (with limit)
+            // Log specific device parameters
             this.logDeviceParameters(parsedData.tags, imei);
 
             // Register or get device
@@ -173,14 +121,12 @@ class PacketProcessor {
             const processor = this.processors.get(parsedData.type);
             if (!processor) {
                 logger.error(`No processor found for packet type: ${parsedData.type}`);
-                this.processingStats.totalErrors++;
                 return null;
             }
 
             const processed = await processor(parsedData, device.id);
             if (!processed) {
                 logger.error('Failed to process packet');
-                this.processingStats.totalErrors++;
                 return null;
             }
 
@@ -200,7 +146,6 @@ class PacketProcessor {
                 timestamp: new Date().toISOString()
             });
 
-            this.updateProcessingStats(startTime);
             return mapped;
         } catch (error) {
             logger.error('Packet processing error:', {
@@ -208,29 +153,8 @@ class PacketProcessor {
                 stack: error.stack,
                 timestamp: new Date().toISOString()
             });
-            this.processingStats.totalErrors++;
             throw error;
         }
-    }
-
-    // Update processing statistics
-    updateProcessingStats(startTime) {
-        const processingTime = Date.now() - startTime;
-        this.processingStats.totalProcessed++;
-        this.processingStats.lastProcessed = new Date().toISOString();
-        
-        // Calculate rolling average
-        const totalTime = this.processingStats.averageProcessingTime * (this.processingStats.totalProcessed - 1) + processingTime;
-        this.processingStats.averageProcessingTime = totalTime / this.processingStats.totalProcessed;
-    }
-
-    // Get processing statistics
-    getProcessingStats() {
-        return {
-            ...this.processingStats,
-            queueStats: packetQueue.getStats(),
-            timestamp: new Date().toISOString()
-        };
     }
 
     async processMainPacket(parsed, deviceId) {
