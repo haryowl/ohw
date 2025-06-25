@@ -46,19 +46,29 @@ class PacketProcessor {
             if (parsedData.records && parsedData.records.length > 1) {
                 logger.info(`Processing ${parsedData.records.length} records from packet`);
                 
-                const processedRecords = [];
+                const startTime = Date.now();
+                
+                // Group records by IMEI for batch processing
+                const recordsByImei = new Map();
                 
                 for (let i = 0; i < parsedData.records.length; i++) {
                     const record = parsedData.records[i];
-                    
-                    // Extract IMEI from record
                     const imei = record.tags['0x03']?.value || parsedData.imei;
+                    
                     if (!imei) {
                         logger.warn(`No IMEI found in record ${i}`);
                         continue;
                     }
-
-                    // Register or get device
+                    
+                    if (!recordsByImei.has(imei)) {
+                        recordsByImei.set(imei, []);
+                    }
+                    recordsByImei.get(imei).push(record);
+                }
+                
+                // Process all IMEIs in parallel
+                const devicePromises = Array.from(recordsByImei.keys()).map(async (imei) => {
+                    // Register or get device (only once per IMEI)
                     let device = await deviceManager.getDevice(imei);
                     if (!device) {
                         device = await deviceManager.registerDevice(imei);
@@ -69,25 +79,41 @@ class PacketProcessor {
                     } else {
                         await deviceManager.updateDeviceStatus(imei, 'online');
                     }
-
-                    // Process the record
-                    const processed = await this.processMainPacket(record, device.id);
-                    if (processed) {
-                        // Map the data according to device configuration
-                        const mapped = await this.mapPacketData(processed, device.id);
-                        
-                        // Save to database
-                        await this.saveToDatabase(mapped, device.id);
-                        
-                        // Check for alerts
-                        await this.checkAlerts(device.id, mapped);
-                        
-                        processedRecords.push(mapped);
+                    return { imei, device };
+                });
+                
+                const devices = await Promise.all(devicePromises);
+                const deviceMap = new Map(devices.map(d => [d.imei, d.device]));
+                
+                // Process all records in parallel
+                const recordPromises = [];
+                const allRecords = [];
+                
+                for (const [imei, records] of recordsByImei.entries()) {
+                    const device = deviceMap.get(imei);
+                    
+                    for (const record of records) {
+                        const promise = this.processRecordAsync(record, device.id, imei);
+                        recordPromises.push(promise);
                     }
                 }
                 
-                logger.info(`Successfully processed ${processedRecords.length} records`);
-                return processedRecords.length > 0 ? processedRecords[0] : null;
+                // Wait for all records to be processed
+                const processedRecords = await Promise.all(recordPromises);
+                const validRecords = processedRecords.filter(r => r !== null);
+                
+                // Batch save to database
+                if (validRecords.length > 0) {
+                    await this.batchSaveToDatabase(validRecords);
+                    
+                    // Batch check alerts
+                    await this.batchCheckAlerts(validRecords);
+                }
+                
+                const processingTime = Date.now() - startTime;
+                logger.info(`Successfully processed ${validRecords.length} records in ${processingTime}ms (${(validRecords.length / processingTime * 1000).toFixed(1)} records/sec)`);
+                
+                return validRecords.length > 0 ? validRecords[0] : null;
             }
 
             // Single record processing (existing logic)
@@ -1028,6 +1054,111 @@ class PacketProcessor {
             logger.error('Error logging device parameters:', error);
         }
     }
+
+    // Helper method to process a single record asynchronously
+    async processRecordAsync(record, deviceId, imei) {
+        try {
+            // Process the record
+            const processed = await this.processMainPacket(record, deviceId);
+            if (!processed) {
+                return null;
+            }
+
+            // Map the data according to device configuration
+            const mapped = await this.mapPacketData(processed, deviceId);
+            
+            // Note: Database saving is done in batch later
+            // Note: Alerts are checked in batch later for performance
+            
+            return mapped;
+        } catch (error) {
+            logger.error(`Error processing record for device ${imei}:`, error);
+            return null;
+        }
+    }
+
+    // Batch save multiple records to database
+    async batchSaveToDatabase(records) {
+        try {
+            // Prepare data for bulk insert
+            const dataPointBulk = records.map(record => ({
+                deviceId: record.deviceId,
+                timestamp: record.timestamp,
+                data: JSON.stringify(record.data),
+                type: record.type,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }));
+
+            const recordBulk = records.map(record => ({
+                deviceId: record.deviceId,
+                timestamp: record.timestamp,
+                data: JSON.stringify(record.data),
+                type: record.type,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }));
+
+            // Use bulk insert for better performance
+            if (dataPointBulk.length > 0) {
+                await DataPoint.bulkCreate(dataPointBulk);
+            }
+            
+            if (recordBulk.length > 0) {
+                await Record.bulkCreate(recordBulk);
+            }
+
+            logger.debug(`Batch saved ${records.length} records to database using bulk insert`);
+        } catch (error) {
+            logger.error('Error batch saving to database:', error);
+            
+            // Fallback to individual inserts if bulk insert fails
+            logger.info('Falling back to individual inserts...');
+            try {
+                for (const record of records) {
+                    await this.saveToDatabase(record, record.deviceId);
+                }
+                logger.info('Fallback individual inserts completed');
+            } catch (fallbackError) {
+                logger.error('Fallback individual inserts also failed:', fallbackError);
+                throw fallbackError;
+            }
+        }
+    }
+
+    // Batch check alerts for multiple records
+    async batchCheckAlerts(records) {
+        try {
+            // Group records by device for efficient alert checking
+            const recordsByDevice = new Map();
+            
+            for (const record of records) {
+                if (!recordsByDevice.has(record.deviceId)) {
+                    recordsByDevice.set(record.deviceId, []);
+                }
+                recordsByDevice.get(record.deviceId).push(record);
+            }
+
+            // Check alerts for each device in parallel
+            const alertPromises = Array.from(recordsByDevice.entries()).map(async ([deviceId, deviceRecords]) => {
+                const alerts = await alertManager.getActiveAlerts(deviceId);
+                
+                for (const alert of alerts) {
+                    for (const record of deviceRecords) {
+                        const triggered = this.evaluateAlertCondition(record, alert.condition);
+                        if (triggered) {
+                            await this.triggerAlert(deviceId, alert, record);
+                        }
+                    }
+                }
+            });
+
+            await Promise.all(alertPromises);
+        } catch (error) {
+            logger.error('Error batch checking alerts:', error);
+        }
+    }
 }
 
 module.exports = new PacketProcessor();
+
