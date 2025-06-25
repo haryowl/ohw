@@ -598,32 +598,41 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
             }
         } else {
             // Multiple records packet - FIXED VERSION
-            console.log('Processing multiple records packet with FIXED parser');
+            console.log('Processing multiple records packet with CORRECTED parser');
             
-            // Find all record start positions (0x10 tags)
-            const recordStarts = [];
-            let searchOffset = currentOffset;
+            let dataOffset = currentOffset;
+            let recordIndex = 0;
             
-            while (searchOffset < endOffset - 2) {
-                if (buffer.readUInt8(searchOffset) === 0x10) {
-                    recordStarts.push(searchOffset);
+            while (dataOffset < endOffset - 2) {
+                // Look for next record start (0x10 tag)
+                let recordStart = -1;
+                for (let i = dataOffset; i < endOffset - 2; i++) {
+                    if (buffer.readUInt8(i) === 0x10) {
+                        recordStart = i;
+                        break;
+                    }
                 }
-                searchOffset++;
-            }
-            
-            console.log(`Found ${recordStarts.length} record start positions using 0x10 tags`);
-            
-            // Parse each record
-            for (let i = 0; i < recordStarts.length; i++) {
-                const recordStart = recordStarts[i];
-                const recordEnd = (i < recordStarts.length - 1) ? recordStarts[i + 1] : endOffset;
                 
+                if (recordStart === -1) {
+                    console.log('No more record starts found');
+                    break;
+                }
+                
+                console.log(`Parsing record ${recordIndex + 1} starting at position ${recordStart}`);
+                
+                // Parse this record completely
                 const record = { tags: {} };
                 let recordOffset = recordStart;
                 
-                while (recordOffset < recordEnd && recordOffset < endOffset - 2) {
+                while (recordOffset < endOffset - 2) {
                     const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
+                    
+                    // Check for end of record
+                    if (tag === 0x00) {
+                        console.log(`Record ${recordIndex + 1} ended at position ${recordOffset}`);
+                        break;
+                    }
                     
                     if (tag === 0xFE) {
                         const [extendedTags, newOffset] = await parseExtendedTags(buffer, recordOffset);
@@ -746,15 +755,19 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
+                    console.log(`Record ${recordIndex + 1} parsed with ${Object.keys(record.tags).length} tags`);
                 }
+                
+                // Move to next record start position
+                dataOffset = recordOffset;
+                recordIndex++;
             }
             
             // OPTIMIZED LOGGING - Show performance metrics
             const recordCount = result.records.length;
             if (recordCount > 0) {
-                const processingTime = Date.now(); // This will be calculated in the calling function
                 console.log(`✅ PARSER FIXED: ${recordCount} records processed successfully`);
-                console.log(`📊 Performance: ${recordCount} records in optimized parser`);
+                console.log(`📊 Performance: ${recordCount} records in corrected parser`);
                 console.log(`🔍 Record tags found: ${result.records.map(r => Object.keys(r.tags).length).join(', ')}`);
             }
         }
