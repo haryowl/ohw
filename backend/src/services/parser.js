@@ -168,17 +168,13 @@ class GalileoskyParser extends EventEmitter {
             let currentOffset = offset + 3;
             const endOffset = offset + actualLength;
 
-            console.log(`🔍 Debug: Packet length ${actualLength}, currentOffset ${currentOffset}, endOffset ${endOffset}`);
-
             if (actualLength < 32) {
-                console.log('🔍 Debug: Small packet (< 32 bytes)');
                 // Single record for small packets
                 const record = this.parseRecord(buffer, currentOffset, endOffset);
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
                 }
             } else {
-                console.log('🔍 Debug: Large packet (>= 32 bytes)');
                 // For packets >= 32 bytes, check if there's a 0x10 tag (Number Archive Records)
                 let hasMultipleRecords = false;
                 let searchOffset = currentOffset;
@@ -190,49 +186,48 @@ class GalileoskyParser extends EventEmitter {
                     searchOffset++;
                 }
 
-                console.log(`🔍 Debug: Has multiple records: ${hasMultipleRecords}, found 0x10 at offset ${searchOffset}`);
-
                 if (hasMultipleRecords) {
-                    console.log('🔍 Debug: Processing multiple records');
-                    let recordCount = 0;
-                    // Multiple records - parse each record starting with 0x10 tag
-                    while (currentOffset < endOffset - 2) {
-                        if (buffer.readUInt8(currentOffset) !== 0x10) {
-                            currentOffset++;
+                    // Find all record boundaries first
+                    const recordBoundaries = [];
+                    let recordStart = currentOffset;
+                    
+                    while (recordStart < endOffset - 2) {
+                        if (buffer.readUInt8(recordStart) !== 0x10) {
+                            recordStart++;
                             continue;
                         }
                         
                         // Find the end of this record (next 0x10 tag or end of packet)
-                        let recordEndOffset = currentOffset + 1;
-                        while (recordEndOffset < endOffset - 2) {
-                            if (buffer.readUInt8(recordEndOffset) === 0x10 && recordEndOffset > currentOffset + 1) {
+                        let recordEnd = recordStart + 1;
+                        while (recordEnd < endOffset - 2) {
+                            if (buffer.readUInt8(recordEnd) === 0x10 && recordEnd > recordStart + 1) {
                                 break;
                             }
-                            recordEndOffset++;
+                            recordEnd++;
                         }
                         
-                        console.log(`🔍 Debug: Record ${recordCount + 1} from ${currentOffset} to ${recordEndOffset}`);
-                        const record = this.parseRecord(buffer, currentOffset, recordEndOffset);
+                        recordBoundaries.push({ start: recordStart, end: recordEnd });
+                        recordStart = recordEnd;
+                    }
+
+                    // Process all records in parallel
+                    const recordPromises = recordBoundaries.map(async (boundary) => {
+                        return this.parseRecord(buffer, boundary.start, boundary.end);
+                    });
+
+                    const parsedRecords = await Promise.all(recordPromises);
+                    
+                    // Filter out records with no tags
+                    for (const record of parsedRecords) {
                         if (Object.keys(record.tags).length > 0) {
                             result.records.push(record);
-                            console.log(`🔍 Debug: Added record with ${Object.keys(record.tags).length} tags`);
-                        }
-                        currentOffset = recordEndOffset;
-                        recordCount++;
-                        
-                        // Only debug first 3 records
-                        if (recordCount >= 3) {
-                            console.log(`🔍 Debug: Skipping debug for remaining ${Math.floor((endOffset - currentOffset) / 75)} records`);
-                            break;
                         }
                     }
                 } else {
-                    console.log('🔍 Debug: Processing single record');
                     // Single record - parse directly from currentOffset
                     const record = this.parseRecord(buffer, currentOffset, endOffset);
                     if (Object.keys(record.tags).length > 0) {
                         result.records.push(record);
-                        console.log(`🔍 Debug: Added single record with ${Object.keys(record.tags).length} tags`);
                     }
                 }
             }
@@ -1103,21 +1098,16 @@ class GalileoskyParser extends EventEmitter {
         const record = { tags: {} };
         let recordOffset = startOffset;
 
-        console.log(`🔍 Debug: Parsing record from ${startOffset} to ${endOffset} (length: ${endOffset - startOffset})`);
-
         while (recordOffset < endOffset - 2) {
             const tag = buffer.readUInt8(recordOffset);
             recordOffset++;
 
             if (tag === 0xFE) {
                 // Extended tags not implemented in this fix
-                console.log(`🔍 Debug: Found extended tag 0xFE, stopping`);
                 break;
             }
 
             const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-            console.log(`🔍 Debug: Found tag ${tagHex} at offset ${recordOffset - 1}`);
-            
             const { value, newOffset, definition } = this.parseTagValue(buffer, recordOffset, tagHex);
 
             if (value !== null && definition) {
@@ -1126,15 +1116,11 @@ class GalileoskyParser extends EventEmitter {
                     type: definition.type,
                     description: definition.description
                 };
-                console.log(`🔍 Debug: Added tag ${tagHex} with value:`, value);
-            } else {
-                console.log(`🔍 Debug: Skipped tag ${tagHex} (no definition or null value)`);
             }
 
             recordOffset = newOffset;
         }
 
-        console.log(`🔍 Debug: Record has ${Object.keys(record.tags).length} tags`);
         return record;
     }
 

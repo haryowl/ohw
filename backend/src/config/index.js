@@ -50,6 +50,12 @@ const config = {
         heartbeatInterval: parseInt(process.env.WS_HEARTBEAT_INTERVAL) || 30000 // Default to 30000ms
     },
 
+    parallel: {
+        maxConcurrency: parseInt(process.env.MAX_CONCURRENCY) || Math.max(1, require('os').cpus().length - 1),
+        batchSize: parseInt(process.env.BATCH_SIZE) || 100,
+        enableWorkerThreads: process.env.ENABLE_WORKER_THREADS === 'true' || false
+    },
+
     jwt: {
         secret: process.env.JWT_SECRET || 'your-secret-key',
         expiresIn: process.env.JWT_EXPIRES_IN || '24h'

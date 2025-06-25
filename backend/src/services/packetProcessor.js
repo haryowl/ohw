@@ -9,18 +9,33 @@ const deviceMapper = require('./deviceMapper');
 const alertManager = require('./alertManager');
 const parser = require('./parser');
 const { parsePacket } = require('./parser');
+const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
+const os = require('os');
 
 class PacketProcessor {
     constructor() {
         this.parser = new GalileoskyParser();
         this.processors = new Map();
         this.initializeProcessors();
+        
+        // Configure parallel processing
+        this.maxConcurrency = config.parallel?.maxConcurrency || Math.max(1, os.cpus().length - 1);
+        this.batchSize = config.parallel?.batchSize || 100;
+        this.workerPool = [];
+        this.initializeWorkerPool();
     }
 
     initializeProcessors() {
         this.processors.set('main', this.processMainPacket.bind(this));
         this.processors.set('type33', this.processType33Packet.bind(this));
         this.processors.set('confirmation', this.processConfirmationPacket.bind(this));
+    }
+
+    initializeWorkerPool() {
+        // Initialize worker pool for parallel processing
+        if (this.maxConcurrency > 1) {
+            logger.info(`Initializing worker pool with ${this.maxConcurrency} workers for parallel processing`);
+        }
     }
 
     async processPacket(packet, socket) {
@@ -85,22 +100,18 @@ class PacketProcessor {
                 const devices = await Promise.all(devicePromises);
                 const deviceMap = new Map(devices.map(d => [d.imei, d.device]));
                 
-                // Process all records in parallel
-                const recordPromises = [];
+                // Process all records using chunked parallel processing
                 const allRecords = [];
                 
                 for (const [imei, records] of recordsByImei.entries()) {
                     const device = deviceMap.get(imei);
                     
-                    for (const record of records) {
-                        const promise = this.processRecordAsync(record, device.id, imei);
-                        recordPromises.push(promise);
-                    }
+                    // Use chunked processing for large record sets
+                    const processedRecords = await this.processRecordsInChunks(records, device.id, imei);
+                    allRecords.push(...processedRecords);
                 }
                 
-                // Wait for all records to be processed
-                const processedRecords = await Promise.all(recordPromises);
-                const validRecords = processedRecords.filter(r => r !== null);
+                const validRecords = allRecords.filter(r => r !== null);
                 
                 // Batch save to database
                 if (validRecords.length > 0) {
@@ -111,7 +122,8 @@ class PacketProcessor {
                 }
                 
                 const processingTime = Date.now() - startTime;
-                logger.info(`Successfully processed ${validRecords.length} records in ${processingTime}ms (${(validRecords.length / processingTime * 1000).toFixed(1)} records/sec)`);
+                const recordsPerSecond = (validRecords.length / processingTime * 1000).toFixed(1);
+                logger.info(`Successfully processed ${validRecords.length} records in ${processingTime}ms (${recordsPerSecond} records/sec) using parallel processing`);
                 
                 return validRecords.length > 0 ? validRecords[0] : null;
             }
@@ -1157,6 +1169,56 @@ class PacketProcessor {
         } catch (error) {
             logger.error('Error batch checking alerts:', error);
         }
+    }
+
+    // Process records in chunks to avoid memory issues
+    async processRecordsInChunks(records, deviceId, imei) {
+        const chunks = [];
+        for (let i = 0; i < records.length; i += this.batchSize) {
+            chunks.push(records.slice(i, i + this.batchSize));
+        }
+
+        const results = [];
+        for (const chunk of chunks) {
+            const chunkResults = await this.processRecordChunk(chunk, deviceId, imei);
+            results.push(...chunkResults);
+        }
+        return results;
+    }
+
+    // Process a chunk of records with controlled concurrency
+    async processRecordChunk(records, deviceId, imei) {
+        const semaphore = new Array(this.maxConcurrency).fill(null);
+        const results = new Array(records.length);
+        let completed = 0;
+
+        return new Promise((resolve, reject) => {
+            const processNext = async (index) => {
+                if (index >= records.length) {
+                    completed++;
+                    if (completed === records.length) {
+                        resolve(results.filter(r => r !== null));
+                    }
+                    return;
+                }
+
+                try {
+                    const result = await this.processRecordAsync(records[index], deviceId, imei);
+                    results[index] = result;
+                } catch (error) {
+                    logger.error(`Error processing record ${index}:`, error);
+                    results[index] = null;
+                }
+
+                // Process next record
+                processNext(index + this.maxConcurrency);
+            };
+
+            // Start initial batch of workers
+            for (let i = 0; i < Math.min(this.maxConcurrency, records.length); i++) {
+                processNext(i);
+            }
+        });
     }
 }
 
