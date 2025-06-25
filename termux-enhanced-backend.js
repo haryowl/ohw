@@ -38,6 +38,9 @@ const PARSED_DATA_FILE = path.join(dataDir, 'parsed_data.json');
 const DEVICES_FILE = path.join(dataDir, 'devices.json');
 const LAST_IMEI_FILE = path.join(dataDir, 'last_imei.json');
 
+// Configuration constants
+const MAX_RECORDS = 10000; // Maximum number of records to keep in memory and storage
+
 // Global variables for IMEI persistence
 let lastIMEI = null;
 let parsedData = [];
@@ -46,8 +49,8 @@ let devices = new Map();
 // Data persistence functions
 function saveData() {
     try {
-        // Save parsed data (keep only last 1000 records to prevent file from getting too large)
-        const dataToSave = parsedData.slice(-1000);
+        // Save parsed data (keep only last MAX_RECORDS to prevent file from getting too large)
+        const dataToSave = parsedData.slice(-MAX_RECORDS);
         fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(dataToSave, null, 2));
         
         // Save devices data
@@ -972,9 +975,9 @@ function addParsedData(data) {
             // Add to data array
             parsedData.unshift(extractedData);
             
-            // Limit data to last 1000 records
-            if (parsedData.length > 1000) {
-                parsedData = parsedData.slice(0, 1000);
+            // Limit data to last MAX_RECORDS
+            if (parsedData.length > MAX_RECORDS) {
+                parsedData = parsedData.slice(0, MAX_RECORDS);
             }
         }
         
@@ -988,6 +991,7 @@ function addParsedData(data) {
         console.log(`⚡ Performance: ${recordsPerSecond.toFixed(0)} records/second`);
         console.log(`📊 Speed: ${(processingTime / recordCount).toFixed(2)}ms per record`);
         console.log(`🔍 Tags found: ${data.records.map(r => Object.keys(r.tags).length).join(', ')}`);
+        console.log(`💾 Storage: ${parsedData.length}/${MAX_RECORDS} records in memory`);
         
         // Update device stats
         if (lastIMEI) {
