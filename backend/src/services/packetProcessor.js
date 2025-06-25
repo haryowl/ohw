@@ -75,7 +75,7 @@ class PacketProcessor {
                         logger.warn(`No IMEI found in record ${i}`);
                         continue;
                     }
-                    
+
                     if (!recordsByImei.has(imei)) {
                         recordsByImei.set(imei, []);
                     }
@@ -884,9 +884,9 @@ class PacketProcessor {
     async processConfirmationPacket(parsed, deviceId) {
         try {
             const result = {
-                type: 'confirmation',
-                deviceId,
-                timestamp: new Date(),
+            type: 'confirmation',
+            deviceId,
+            timestamp: new Date(),
                 data: {}
             };
 
@@ -935,16 +935,16 @@ class PacketProcessor {
                 return processed; // Return as-is if no mappings
             }
 
-            const mapped = { ...processed };
+        const mapped = { ...processed };
 
             // Apply mappings to data
             for (const [field, mapping] of Object.entries(mappings)) {
                 if (processed.data[field] !== undefined) {
                     mapped.data[field] = this.applyMapping(processed.data[field], mapping);
-                }
             }
+        }
 
-            return mapped;
+        return mapped;
         } catch (error) {
             logger.error('Error mapping packet data:', error);
             return processed; // Return original if mapping fails
@@ -953,7 +953,7 @@ class PacketProcessor {
 
     applyMapping(value, mapping) {
         try {
-            let result = value;
+        let result = value;
 
             // Apply transformations
             if (mapping.transform) {
@@ -974,11 +974,11 @@ class PacketProcessor {
             }
 
             // Convert units if specified
-            if (mapping.unit) {
-                result = this.convertUnit(result, mapping.unit);
-            }
+        if (mapping.unit) {
+            result = this.convertUnit(result, mapping.unit);
+        }
 
-            return result;
+        return result;
         } catch (error) {
             logger.error('Error applying mapping:', error);
             return value; // Return original value if mapping fails
@@ -1024,7 +1024,7 @@ class PacketProcessor {
     async checkAlerts(deviceId, data) {
         try {
             const alerts = await alertManager.getActiveAlerts(deviceId);
-            
+
             for (const alert of alerts) {
                 const triggered = this.evaluateAlertCondition(data, alert.condition);
                 

@@ -16,6 +16,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: false
     },
+    datetime: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Device datetime from tag 0x20'
+    },
     rawData: {
       type: DataTypes.TEXT,
       allowNull: true

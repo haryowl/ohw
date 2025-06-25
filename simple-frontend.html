@@ -283,24 +283,31 @@
 
         .track-point {
             background: white;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            border-left: 3px solid #4caf50;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
             font-size: 0.85em;
         }
 
         .track-point .time {
-            font-weight: bold;
-            color: #2c3e50;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .track-point .time:first-child {
+            color: #007bff;
+        }
+
+        .track-point .time:last-of-type {
+            color: #6c757d;
+            font-size: 0.9em;
         }
 
         .track-point .coordinates {
-            font-family: 'Courier New', monospace;
-            background: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.8em;
+            font-family: monospace;
+            color: #495057;
+            margin-bottom: 4px;
         }
 
         .data-grid {
@@ -856,21 +863,24 @@
 
             // Update track summary
             const duration = trackingData.length > 1 
-                ? Math.round((new Date(trackingData[trackingData.length - 1].timestamp) - new Date(trackingData[0].timestamp)) / (1000 * 60 * 60))
+                ? Math.round((new Date(trackingData[trackingData.length - 1].datetime || trackingData[trackingData.length - 1].timestamp) - new Date(trackingData[0].datetime || trackingData[0].timestamp)) / (1000 * 60 * 60))
                 : 0;
 
             document.getElementById('trackSummary').innerHTML = `
                 <h4>Track Summary</h4>
                 <div><strong>Points:</strong> ${trackingData.length}</div>
                 <div><strong>Duration:</strong> ${duration} hours</div>
-                <div><strong>Start:</strong> ${new Date(trackingData[0].timestamp).toLocaleString()}</div>
-                <div><strong>End:</strong> ${new Date(trackingData[trackingData.length - 1].timestamp).toLocaleString()}</div>
+                <div><strong>Device Start:</strong> ${new Date(trackingData[0].datetime || trackingData[0].timestamp).toLocaleString()}</div>
+                <div><strong>Device End:</strong> ${new Date(trackingData[trackingData.length - 1].datetime || trackingData[trackingData.length - 1].timestamp).toLocaleString()}</div>
+                <div><strong>Server Start:</strong> ${new Date(trackingData[0].timestamp).toLocaleString()}</div>
+                <div><strong>Server End:</strong> ${new Date(trackingData[trackingData.length - 1].timestamp).toLocaleString()}</div>
             `;
 
             // Update track points
             const pointsHtml = trackingData.slice(-10).reverse().map(point => `
                 <div class="track-point">
-                    <div class="time">${new Date(point.timestamp).toLocaleString()}</div>
+                    <div class="time">Device: ${new Date(point.datetime || point.timestamp).toLocaleString()}</div>
+                    <div class="time">Server: ${new Date(point.timestamp).toLocaleString()}</div>
                     <div class="coordinates">${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
                     ${point.speed ? `<div>Speed: ${point.speed} km/h</div>` : ''}
                     ${point.direction ? `<div>Direction: ${point.direction}°</div>` : ''}
@@ -1365,7 +1375,8 @@
                     endDate: new Date(endDate).toISOString()
                 });
                 
-                const response = await fetch(`${config.apiUrl}/api/data/${deviceId}/tracking?${params}`);
+                // Use the new export endpoint that filters by device datetime
+                const response = await fetch(`${config.apiUrl}/api/data/${deviceId}/export?${params}`);
                 if (!response.ok) throw new Error('Failed to fetch export data');
                 
                 exportData = await response.json();

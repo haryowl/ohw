@@ -1022,7 +1022,8 @@ class GalileoskyParser extends EventEmitter {
 
             const recordData = {
                 deviceImei: imei,
-                timestamp: record.tags['0x20']?.value || new Date(),
+                timestamp: new Date(), // Server timestamp when record was received
+                datetime: record.tags['0x20']?.value || null, // Device datetime from tag 0x20
                 recordNumber: record.tags['0x10']?.value,
                 milliseconds: record.tags['0x21']?.value,
                 latitude: record.tags['0x30']?.value?.latitude,
