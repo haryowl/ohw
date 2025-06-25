@@ -14,14 +14,15 @@ const os = require('os');
 
 class PacketProcessor {
     constructor() {
-        this.parser = new GalileoskyParser();
+        this.parser = parser;
         this.processors = new Map();
-        this.initializeProcessors();
+        this.maxWorkers = 4;
+        this.batchSize = 100;
+        this.maxConcurrency = 10;
+        this.deviceMappingsCache = new Map(); // Cache for device mappings
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache timeout
         
-        // Configure parallel processing
-        this.maxConcurrency = config.parallel?.maxConcurrency || Math.max(1, os.cpus().length - 1);
-        this.batchSize = config.parallel?.batchSize || 100;
-        this.workerPool = [];
+        this.initializeProcessors();
         this.initializeWorkerPool();
     }
 
@@ -904,10 +905,31 @@ class PacketProcessor {
         }
     }
 
+    // Get device mappings with caching
+    async getDeviceMappingsCached(deviceId) {
+        const cacheKey = deviceId;
+        const cached = this.deviceMappingsCache.get(cacheKey);
+        
+        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
+            return cached.mappings;
+        }
+        
+        // Fetch fresh mappings from database
+        const mappings = await deviceMapper.getDeviceMappings(deviceId);
+        
+        // Cache the mappings
+        this.deviceMappingsCache.set(cacheKey, {
+            mappings,
+            timestamp: Date.now()
+        });
+        
+        return mappings;
+    }
+
     async mapPacketData(processed, deviceId) {
         try {
-            // Get device mapping configuration
-            const mappings = await deviceMapper.getDeviceMappings(deviceId);
+            // Get device mapping configuration with caching
+            const mappings = await this.getDeviceMappingsCached(deviceId);
             
             if (!mappings || Object.keys(mappings).length === 0) {
                 return processed; // Return as-is if no mappings
@@ -1070,17 +1092,17 @@ class PacketProcessor {
     // Helper method to process a single record asynchronously
     async processRecordAsync(record, deviceId, imei) {
         try {
-            // Process the record
+            // Process the record (this should be fast now with parallel parsing)
             const processed = await this.processMainPacket(record, deviceId);
             if (!processed) {
                 return null;
             }
 
-            // Map the data according to device configuration
+            // Map the data according to device configuration (now cached)
             const mapped = await this.mapPacketData(processed, deviceId);
             
-            // Note: Database saving is done in batch later
-            // Note: Alerts are checked in batch later for performance
+            // Add deviceId to the record for batch operations
+            mapped.deviceId = deviceId;
             
             return mapped;
         } catch (error) {
@@ -1188,37 +1210,20 @@ class PacketProcessor {
 
     // Process a chunk of records with controlled concurrency
     async processRecordChunk(records, deviceId, imei) {
-        const semaphore = new Array(this.maxConcurrency).fill(null);
-        const results = new Array(records.length);
-        let completed = 0;
-
-        return new Promise((resolve, reject) => {
-            const processNext = async (index) => {
-                if (index >= records.length) {
-                    completed++;
-                    if (completed === records.length) {
-                        resolve(results.filter(r => r !== null));
-                    }
-                    return;
-                }
-
-                try {
-                    const result = await this.processRecordAsync(records[index], deviceId, imei);
-                    results[index] = result;
-                } catch (error) {
-                    logger.error(`Error processing record ${index}:`, error);
-                    results[index] = null;
-                }
-
-                // Process next record
-                processNext(index + this.maxConcurrency);
-            };
-
-            // Start initial batch of workers
-            for (let i = 0; i < Math.min(this.maxConcurrency, records.length); i++) {
-                processNext(i);
+        // Process all records in parallel using Promise.all()
+        const recordPromises = records.map(async (record, index) => {
+            try {
+                const result = await this.processRecordAsync(record, deviceId, imei);
+                return result;
+            } catch (error) {
+                logger.error(`Error processing record ${index}:`, error);
+                return null;
             }
         });
+
+        // Wait for all records to be processed in parallel
+        const results = await Promise.all(recordPromises);
+        return results.filter(r => r !== null);
     }
 }
 
