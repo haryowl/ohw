@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const logger = require('../utils/logger');
 const packetProcessor = require('./packetProcessor');
+const config = require('../config');
 
 class PacketQueue extends EventEmitter {
     constructor(options = {}) {
@@ -9,13 +10,14 @@ class PacketQueue extends EventEmitter {
         this.maxQueueSize = options.maxQueueSize || 1000;
         this.processingTimeout = options.processingTimeout || 30000; // 30 seconds
         this.queue = [];
-        this.processing = new Set();
+        this.processing = false;
+        this.activeProcessors = 0;
         this.stats = {
-            queued: 0,
-            processed: 0,
-            failed: 0,
-            dropped: 0,
-            avgProcessingTime: 0
+            totalProcessed: 0,
+            totalQueued: 0,
+            totalDropped: 0,
+            averageProcessingTime: 0,
+            queueSize: 0
         };
         
         // Start processing
@@ -25,144 +27,109 @@ class PacketQueue extends EventEmitter {
     /**
      * Add a packet to the processing queue
      */
-    async enqueue(packet, socket, metadata = {}) {
-        const queueItem = {
-            id: Date.now() + Math.random(),
-            packet,
-            socket,
-            metadata,
-            timestamp: new Date(),
-            retries: 0
-        };
+    async enqueue(packet, socket, processor) {
+        try {
+            // Check queue size limit
+            if (this.queue.length >= this.maxQueueSize) {
+                logger.warn(`Packet queue full, dropping packet. Queue size: ${this.queue.length}`);
+                this.stats.totalDropped++;
+                return false;
+            }
 
-        // Check queue size limit
-        if (this.queue.length >= this.maxQueueSize) {
-            logger.warn('Packet queue full, dropping oldest packet', {
-                queueSize: this.queue.length,
-                maxSize: this.maxQueueSize,
-                droppedPacketId: this.queue[0].id
-            });
-            this.queue.shift(); // Remove oldest packet
-            this.stats.dropped++;
+            const queueItem = {
+                packet,
+                socket,
+                processor,
+                timestamp: Date.now(),
+                id: Math.random().toString(36).substr(2, 9)
+            };
+
+            this.queue.push(queueItem);
+            this.stats.totalQueued++;
+            this.stats.queueSize = this.queue.length;
+
+            logger.debug(`Packet queued. Queue size: ${this.queue.length}`);
+
+            // Start processing if not already running
+            if (!this.processing) {
+                this.startProcessing();
+            }
+
+            return true;
+        } catch (error) {
+            logger.error('Error adding packet to queue:', error);
+            return false;
         }
-
-        this.queue.push(queueItem);
-        this.stats.queued++;
-
-        logger.debug('Packet queued for processing', {
-            packetId: queueItem.id,
-            queueSize: this.queue.length,
-            processingCount: this.processing.size,
-            metadata
-        });
-
-        // Emit event for monitoring
-        this.emit('queued', queueItem);
     }
 
     /**
      * Start the processing loop
      */
-    startProcessing() {
-        const processNext = async () => {
-            // Check if we can process more packets
-            if (this.processing.size >= this.maxConcurrent || this.queue.length === 0) {
-                setTimeout(processNext, 10); // Check again in 10ms
-                return;
-            }
+    async startProcessing() {
+        if (this.processing) {
+            return;
+        }
 
+        this.processing = true;
+        logger.info('Starting packet queue processing');
+
+        while (this.queue.length > 0 && this.activeProcessors < this.maxConcurrent) {
             const item = this.queue.shift();
-            if (!item) {
-                setTimeout(processNext, 10);
-                return;
+            this.stats.queueSize = this.queue.length;
+
+            if (item) {
+                this.activeProcessors++;
+                this.processPacketAsync(item);
             }
+        }
 
-            // Add to processing set
-            this.processing.add(item.id);
-            const startTime = Date.now();
-
-            try {
-                logger.debug('Starting packet processing', {
-                    packetId: item.id,
-                    queueSize: this.queue.length,
-                    processingCount: this.processing.size
-                });
-
-                // Process the packet with timeout
-                await this.processWithTimeout(item);
-
-                const processingTime = Date.now() - startTime;
-                this.stats.processed++;
-                this.stats.avgProcessingTime = 
-                    (this.stats.avgProcessingTime * (this.stats.processed - 1) + processingTime) / this.stats.processed;
-
-                logger.debug('Packet processed successfully', {
-                    packetId: item.id,
-                    processingTime,
-                    avgProcessingTime: this.stats.avgProcessingTime
-                });
-
-                this.emit('processed', item, processingTime);
-
-            } catch (error) {
-                const processingTime = Date.now() - startTime;
-                this.stats.failed++;
-
-                logger.error('Packet processing failed', {
-                    packetId: item.id,
-                    error: error.message,
-                    processingTime,
-                    retries: item.retries
-                });
-
-                // Retry logic
-                if (item.retries < 3) {
-                    item.retries++;
-                    item.timestamp = new Date();
-                    this.queue.unshift(item); // Add back to front of queue
-                    logger.info('Retrying packet processing', {
-                        packetId: item.id,
-                        retries: item.retries
-                    });
-                } else {
-                    logger.error('Packet processing failed after max retries', {
-                        packetId: item.id,
-                        maxRetries: 3
-                    });
-                    this.emit('failed', item, error);
-                }
-            } finally {
-                // Remove from processing set
-                this.processing.delete(item.id);
-            }
-
-            // Process next packet immediately
-            setImmediate(processNext);
-        };
-
-        // Start the processing loop
-        setImmediate(processNext);
+        this.processing = false;
+        
+        // If there are still items in queue, continue processing
+        if (this.queue.length > 0) {
+            setTimeout(() => this.startProcessing(), 10);
+        }
     }
 
     /**
-     * Process a packet with timeout
+     * Process a packet asynchronously
      */
-    async processWithTimeout(item) {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('Packet processing timeout'));
-            }, this.processingTimeout);
+    async processPacketAsync(queueItem) {
+        const startTime = Date.now();
+        
+        try {
+            logger.debug(`Processing packet ${queueItem.id}`);
+            
+            // Process the packet
+            await queueItem.processor(queueItem.packet, queueItem.socket);
+            
+            // Update statistics
+            const processingTime = Date.now() - startTime;
+            this.updateStats(processingTime);
+            
+            logger.debug(`Packet ${queueItem.id} processed successfully in ${processingTime}ms`);
+            
+        } catch (error) {
+            logger.error(`Error processing packet ${queueItem.id}:`, error);
+        } finally {
+            this.activeProcessors--;
+            
+            // Continue processing if there are more items
+            if (this.queue.length > 0 && this.activeProcessors < this.maxConcurrent) {
+                setTimeout(() => this.startProcessing(), 1);
+            }
+        }
+    }
 
-            packetProcessor.processPacket(item.packet, item.socket)
-                .then((result) => {
-                    clearTimeout(timeout);
-                    resolve(result);
-                })
-                .catch((error) => {
-                    clearTimeout(timeout);
-                    reject(error);
-                });
-        });
+    /**
+     * Update processing statistics
+     */
+    updateStats(processingTime) {
+        this.stats.totalProcessed++;
+        
+        // Calculate rolling average
+        const totalTime = this.stats.averageProcessingTime * (this.stats.totalProcessed - 1) + processingTime;
+        this.stats.averageProcessingTime = totalTime / this.stats.totalProcessed;
     }
 
     /**
@@ -171,10 +138,9 @@ class PacketQueue extends EventEmitter {
     getStats() {
         return {
             ...this.stats,
-            queueSize: this.queue.length,
-            processingCount: this.processing.size,
-            maxConcurrent: this.maxConcurrent,
-            maxQueueSize: this.maxQueueSize
+            activeProcessors: this.activeProcessors,
+            isProcessing: this.processing,
+            timestamp: new Date().toISOString()
         };
     }
 
@@ -184,23 +150,23 @@ class PacketQueue extends EventEmitter {
     async clear() {
         logger.info('Clearing packet queue', {
             queueSize: this.queue.length,
-            processingCount: this.processing.size
+            processingCount: this.activeProcessors
         });
 
         // Wait for current processing to complete
-        while (this.processing.size > 0) {
+        while (this.activeProcessors > 0) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         this.queue = [];
-        this.processing.clear();
+        this.processing = false;
     }
 
     /**
      * Pause processing
      */
     pause() {
-        this.paused = true;
+        this.processing = false;
         logger.info('Packet queue processing paused');
     }
 
@@ -208,8 +174,24 @@ class PacketQueue extends EventEmitter {
      * Resume processing
      */
     resume() {
-        this.paused = false;
+        this.processing = true;
         logger.info('Packet queue processing resumed');
+    }
+
+    /**
+     * Set queue size limit
+     */
+    setMaxQueueSize(size) {
+        this.maxQueueSize = size;
+        logger.info(`Packet queue size limit set to ${size}`);
+    }
+
+    /**
+     * Set concurrent processing limit
+     */
+    setMaxConcurrentProcessing(limit) {
+        this.maxConcurrent = limit;
+        logger.info(`Concurrent processing limit set to ${limit}`);
     }
 }
 
