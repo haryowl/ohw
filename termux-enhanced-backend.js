@@ -470,6 +470,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
         if (actualLength < 32) {
             // Single record packet
+            console.log(`Processing small packet (< 32 bytes) with length: ${actualLength}`);
             const record = { tags: {} };
             let recordOffset = currentOffset;
 
@@ -591,13 +592,17 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     description: definition.description
                 };
 
+                console.log(`Small packet - Parsed tag ${tagHex}: ${value}`);
+
                 if (tagHex === '0x03' && definition.type === 'string') {
                     lastIMEI = value;
+                    console.log(`IMEI extracted from small packet: ${value}`);
                 }
             }
 
             if (Object.keys(record.tags).length > 0) {
                 result.records.push(record);
+                console.log(`Small packet parsed with ${Object.keys(record.tags).length} tags: ${Object.keys(record.tags).join(', ')}`);
             }
         } else {
             // Multiple records packet - FIXED VERSION
@@ -751,27 +756,19 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                         description: definition.description
                     };
 
+                    // Extract IMEI from multiple records packet
                     if (tagHex === '0x03' && definition.type === 'string') {
                         lastIMEI = value;
+                        console.log(`IMEI extracted from multiple records packet: ${value}`);
                     }
                 }
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
-                    console.log(`Record ${recordIndex + 1} parsed with ${Object.keys(record.tags).length} tags`);
                 }
                 
-                // Move to next record start position
                 dataOffset = recordOffset;
                 recordIndex++;
-            }
-            
-            // OPTIMIZED LOGGING - Show performance metrics
-            const recordCount = result.records.length;
-            if (recordCount > 0) {
-                console.log(`✅ PARSER FIXED: ${recordCount} records processed successfully`);
-                console.log(`📊 Performance: ${recordCount} records in corrected parser`);
-                console.log(`🔍 Record tags found: ${result.records.map(r => Object.keys(r.tags).length).join(', ')}`);
             }
         }
 
