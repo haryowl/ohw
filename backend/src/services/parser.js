@@ -285,7 +285,7 @@ class GalileoskyParser extends EventEmitter {
             for (let i = 0; i < tagsCount; i++) {
                 const tag = buffer.readUInt8(record.nextOffset + i);
                 const tagHex = `0x${tag.toString(16).toUpperCase()}`;
-                const { value, newOffset } = await this.parseTagValue(buffer, record.nextOffset + tagsCount, tagHex);
+                const { value, newOffset } = this.parseTagValue(buffer, record.nextOffset + tagsCount, tagHex);
                 record.tags[tagHex] = {
                     value: value,
                     type: tagDefinitions[tagHex]?.type,
@@ -301,7 +301,7 @@ class GalileoskyParser extends EventEmitter {
             for (let i = 0; i < 32; i++) {
                 if (bitmask & (1 << i)) {
                     const tagHex = `0x${i.toString(16).toUpperCase()}`;
-                    const { value, newOffset } = await this.parseTagValue(buffer, record.nextOffset, i);
+                    const { value, newOffset } = this.parseTagValue(buffer, record.nextOffset, i);
                     record.tags[tagHex] = {
                         value: value,
                         type: tagDefinitions[tagHex]?.type,
@@ -415,10 +415,8 @@ class GalileoskyParser extends EventEmitter {
         }, offset + 1 + length];
     }
 
-    /**
-     * Parse tag value based on tag definition
-     */
-    async parseTagValue(buffer, recordOffset, tagHex) {
+    // Synchronous tag value parser
+    parseTagValue(buffer, recordOffset, tagHex) {
         const definition = this.tagDefinitionsCache.get(tagHex);
         if (!definition) {
             return { value: null, newOffset: recordOffset + 1 };
@@ -464,21 +462,23 @@ class GalileoskyParser extends EventEmitter {
                 value = new Date(buffer.readUInt32LE(recordOffset) * 1000);
                 newOffset = recordOffset + 4;
                 break;
-            case 'coordinates':
+            case 'coordinates': {
                 const satellites = buffer.readUInt8(recordOffset) & 0x0F;
                 const correctness = (buffer.readUInt8(recordOffset) >> 4) & 0x0F;
-                newOffset = recordOffset + 1;
-                const lat = buffer.readInt32LE(newOffset) / 1000000;
-                newOffset += 4;
-                const lon = buffer.readInt32LE(newOffset) / 1000000;
-                newOffset += 4;
+                let tempOffset = recordOffset + 1;
+                const lat = buffer.readInt32LE(tempOffset) / 1000000;
+                tempOffset += 4;
+                const lon = buffer.readInt32LE(tempOffset) / 1000000;
+                tempOffset += 4;
                 value = { latitude: lat, longitude: lon, satellites, correctness };
+                newOffset = tempOffset;
                 break;
+            }
             case 'status':
                 value = buffer.readUInt16LE(recordOffset);
                 newOffset = recordOffset + 2;
                 break;
-            case 'outputs':
+            case 'outputs': {
                 const outputsValue = buffer.readUInt16LE(recordOffset);
                 const outputsBinary = this.binaryCache.get(outputsValue);
                 value = {
@@ -491,7 +491,8 @@ class GalileoskyParser extends EventEmitter {
                 }
                 newOffset = recordOffset + 2;
                 break;
-            case 'inputs':
+            }
+            case 'inputs': {
                 const inputsValue = buffer.readUInt16LE(recordOffset);
                 const inputsBinary = this.binaryCache.get(inputsValue);
                 value = {
@@ -504,7 +505,8 @@ class GalileoskyParser extends EventEmitter {
                 }
                 newOffset = recordOffset + 2;
                 break;
-            case 'speedDirection':
+            }
+            case 'speedDirection': {
                 const speedValue = buffer.readUInt16LE(recordOffset);
                 const directionValue = buffer.readUInt16LE(recordOffset + 2);
                 value = {
@@ -513,6 +515,7 @@ class GalileoskyParser extends EventEmitter {
                 };
                 newOffset = recordOffset + 4;
                 break;
+            }
             default:
                 newOffset = recordOffset + (definition.length || 1);
                 value = null;
@@ -1094,7 +1097,7 @@ class GalileoskyParser extends EventEmitter {
         }
     }
 
-    // Optimized record parsing function
+    // Optimized record parsing function (synchronous)
     parseRecord(buffer, startOffset, endOffset) {
         const record = { tags: {} };
         let recordOffset = startOffset;
@@ -1119,6 +1122,7 @@ class GalileoskyParser extends EventEmitter {
                 };
             }
 
+            // Advance offset by the correct value length (from parseTagValue)
             recordOffset = newOffset;
         }
 
