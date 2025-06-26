@@ -10,22 +10,35 @@
 echo "🚀 Starting Galileosky Parser with Peer Sync..."
 echo ""
 
-# Function to get IP address
+# Function to get IP address (Termux compatible)
 get_ip_address() {
-    # Try to get IP from wlan0 first (WiFi)
-    local ip=$(ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
-    
-    # If no wlan0, try other interfaces
-    if [ -z "$ip" ]; then
-        ip=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' | cut -d/ -f1)
+    # Try to get IP using ifconfig (if available)
+    if command -v ifconfig &> /dev/null; then
+        local ip=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | head -1)
+        if [ ! -z "$ip" ]; then
+            echo "$ip"
+            return
+        fi
     fi
     
-    # If still no IP, use localhost
-    if [ -z "$ip" ]; then
-        ip="localhost"
+    # Try using netstat
+    local ip=$(netstat -rn | grep '^0.0.0.0' | awk '{print $2}' | head -1)
+    if [ ! -z "$ip" ]; then
+        echo "$ip"
+        return
     fi
     
-    echo "$ip"
+    # Try using /proc/net/route
+    if [ -f "/proc/net/route" ]; then
+        local ip=$(cat /proc/net/route | grep -v 'Iface' | awk '{print $2}' | head -1)
+        if [ ! -z "$ip" ]; then
+            echo "$ip"
+            return
+        fi
+    fi
+    
+    # Fallback to localhost
+    echo "localhost"
 }
 
 # Get IP address
