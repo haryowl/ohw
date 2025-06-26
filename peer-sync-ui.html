@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer-to-Peer Sync - Galileosky Parser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+
+        .section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #1e7e34;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-entry.info { color: #007bff; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.error { color: #dc3545; }
+        .log-entry.warning { color: #ffc107; }
+
+        .device-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.8em;
+        }
+
+        .qr-code {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .qr-code img {
+            max-width: 200px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 Peer-to-Peer Sync</h1>
+            <p>Sync data between mobile devices without internet</p>
+        </div>
+
+        <div class="content">
+            <!-- Device Status -->
+            <div class="section">
+                <h3>📊 Device Status</h3>
+                <div id="deviceStatus" class="device-info">
+                    Loading device status...
+                </div>
+                <button class="btn btn-primary" onclick="refreshStatus()">🔄 Refresh Status</button>
+            </div>
+
+            <!-- Server Mode -->
+            <div class="section">
+                <h3>🖥️ Server Mode</h3>
+                <p>Make this device available for other devices to connect to</p>
+                <div id="serverStatus" class="status info">
+                    Server not running
+                </div>
+                <button class="btn btn-success" onclick="startServer()" id="startServerBtn">▶️ Start Server</button>
+                <button class="btn btn-danger" onclick="stopServer()" id="stopServerBtn" style="display: none;">⏹️ Stop Server</button>
+                
+                <div id="serverInfo" style="display: none;">
+                    <div class="device-info">
+                        <strong>Connection URL:</strong><br>
+                        <span id="connectionUrl">http://YOUR_IP:3001/peer/sync</span>
+                    </div>
+                    <div class="qr-code">
+                        <p>📱 Scan QR code to connect from another device:</p>
+                        <div id="qrCode"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Mode -->
+            <div class="section">
+                <h3>🔗 Connect to Peer</h3>
+                <p>Connect to another device to sync data</p>
+                <div class="input-group">
+                    <label for="peerUrl">Peer Device URL:</label>
+                    <input type="text" id="peerUrl" placeholder="http://192.168.1.100:3001" value="http://192.168.1.100:3001">
+                </div>
+                <button class="btn btn-primary" onclick="checkPeer()">🔍 Check Peer</button>
+                <button class="btn btn-success" onclick="syncWithPeer()">🔄 Sync with Peer</button>
+                
+                <div id="peerStatus" class="status info" style="display: none;">
+                    Peer status will appear here
+                </div>
+            </div>
+
+            <!-- Sync Log -->
+            <div class="section">
+                <h3>📝 Sync Log</h3>
+                <div id="syncLog" class="log">
+                    <div class="log-entry info">Ready for peer-to-peer sync...</div>
+                </div>
+                <button class="btn btn-warning" onclick="clearLog()">🗑️ Clear Log</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:3001' 
+                : `http://${window.location.hostname}:3001`,
+            deviceId: 'mobile-phone-' + Math.random().toString(36).substr(2, 9)
+        };
+
+        let syncInProgress = false;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+            addLog('info', 'Peer sync UI loaded');
+        });
+
+        // Refresh device status
+        async function refreshStatus() {
+            try {
+                const response = await fetch(`${config.apiUrl}/api/peer/status`);
+                if (response.ok) {
+                    const status = await response.json();
+                    updateDeviceStatus(status);
+                    addLog('success', 'Device status refreshed');
+                } else {
+                    addLog('error', 'Failed to get device status');
+                }
+            } catch (error) {
+                addLog('error', 'Error refreshing status: ' + error.message);
+            }
+        }
+
+        // Update device status display
+        function updateDeviceStatus(status) {
+            const deviceStatus = document.getElementById('deviceStatus');
+            deviceStatus.innerHTML = `
+                <strong>Device ID:</strong> ${status.deviceId || config.deviceId}<br>
+                <strong>IP Address:</strong> ${status.deviceIP || 'Unknown'}<br>
+                <strong>Server Mode:</strong> ${status.isServerMode ? '✅ Running' : '❌ Stopped'}<br>
+                <strong>Port:</strong> ${status.port || 3001}<br>
+                <strong>Last Sync:</strong> ${status.lastSyncTime || 'Never'}<br>
+                <strong>Sync in Progress:</strong> ${status.syncInProgress ? '🔄 Yes' : '✅ No'}
+            `;
+        }
+
+        // Start peer server
+        async function startServer() {
+            try {
+                addLog('info', 'Starting peer server...');
+                
+                const response = await fetch(`${config.apiUrl}/api/peer/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId: config.deviceId })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addLog('success', 'Peer server started successfully');
+                    
+                    // Update UI
+                    document.getElementById('startServerBtn').style.display = 'none';
+                    document.getElementById('stopServerBtn').style.display = 'inline-block';
+                    document.getElementById('serverStatus').className = 'status success';
+                    document.getElementById('serverStatus').textContent = 'Server running';
+                    document.getElementById('serverInfo').style.display = 'block';
+                    
+                    // Update connection URL
+                    const deviceIP = result.deviceIP || window.location.hostname;
+                    const connectionUrl = `http://${deviceIP}:${result.port || 3001}/peer/sync`;
+                    document.getElementById('connectionUrl').textContent = connectionUrl;
+                    
+                    // Generate QR code (simple text representation)
+                    document.getElementById('qrCode').innerHTML = `
+                        <div style="border: 2px solid #000; padding: 10px; display: inline-block; font-family: monospace; font-size: 12px;">
+                            ${connectionUrl}
+                        </div>
+                    `;
+                    
+                    refreshStatus();
+                } else {
+                    addLog('error', 'Failed to start peer server');
+                }
+            } catch (error) {
+                addLog('error', 'Error starting server: ' + error.message);
+            }
+        }
+
+        // Stop peer server
+        async function stopServer() {
+            try {
+                addLog('info', 'Stopping peer server...');
+                
+                const response = await fetch(`${config.apiUrl}/api/peer/stop`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    addLog('success', 'Peer server stopped');
+                    
+                    // Update UI
+                    document.getElementById('startServerBtn').style.display = 'inline-block';
+                    document.getElementById('stopServerBtn').style.display = 'none';
+                    document.getElementById('serverStatus').className = 'status info';
+                    document.getElementById('serverStatus').textContent = 'Server not running';
+                    document.getElementById('serverInfo').style.display = 'none';
+                    
+                    refreshStatus();
+                } else {
+                    addLog('error', 'Failed to stop peer server');
+                }
+            } catch (error) {
+                addLog('error', 'Error stopping server: ' + error.message);
+            }
+        }
+
+        // Check peer device
+        async function checkPeer() {
+            const peerUrl = document.getElementById('peerUrl').value.trim();
+            if (!peerUrl) {
+                addLog('error', 'Please enter peer URL');
+                return;
+            }
+
+            try {
+                addLog('info', `Checking peer: ${peerUrl}`);
+                
+                const response = await fetch(`${peerUrl}/peer/status`);
+                if (response.ok) {
+                    const peerStatus = await response.json();
+                    
+                    document.getElementById('peerStatus').style.display = 'block';
+                    document.getElementById('peerStatus').className = 'status success';
+                    document.getElementById('peerStatus').innerHTML = `
+                        <strong>Peer Device:</strong> ${peerStatus.deviceId}<br>
+                        <strong>Records:</strong> ${peerStatus.totalRecords}<br>
+                        <strong>Devices:</strong> ${peerStatus.totalDevices}<br>
+                        <strong>Last Sync:</strong> ${peerStatus.lastSyncTime || 'Never'}
+                    `;
+                    
+                    addLog('success', `Peer found: ${peerStatus.deviceId} with ${peerStatus.totalRecords} records`);
+                } else {
+                    document.getElementById('peerStatus').style.display = 'block';
+                    document.getElementById('peerStatus').className = 'status error';
+                    document.getElementById('peerStatus').textContent = 'Peer not reachable';
+                    addLog('error', 'Peer not reachable');
+                }
+            } catch (error) {
+                document.getElementById('peerStatus').style.display = 'block';
+                document.getElementById('peerStatus').className = 'status error';
+                document.getElementById('peerStatus').textContent = 'Connection failed';
+                addLog('error', 'Connection failed: ' + error.message);
+            }
+        }
+
+        // Sync with peer device
+        async function syncWithPeer() {
+            if (syncInProgress) {
+                addLog('warning', 'Sync already in progress, please wait...');
+                return;
+            }
+
+            const peerUrl = document.getElementById('peerUrl').value.trim();
+            if (!peerUrl) {
+                addLog('error', 'Please enter peer URL');
+                return;
+            }
+
+            syncInProgress = true;
+            addLog('info', 'Starting peer sync...');
+
+            try {
+                const response = await fetch(`${config.apiUrl}/api/peer/connect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ peerUrl: peerUrl })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addLog('success', `Sync completed: ${result.newRecords} new records added`);
+                    
+                    // Update peer status
+                    checkPeer();
+                } else {
+                    const error = await response.json();
+                    addLog('error', 'Sync failed: ' + (error.message || 'Unknown error'));
+                }
+            } catch (error) {
+                addLog('error', 'Sync error: ' + error.message);
+            } finally {
+                syncInProgress = false;
+            }
+        }
+
+        // Add log entry
+        function addLog(type, message) {
+            const log = document.getElementById('syncLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Clear log
+        function clearLog() {
+            document.getElementById('syncLog').innerHTML = '<div class="log-entry info">Log cleared...</div>';
+        }
+
+        // Auto-refresh status every 30 seconds
+        setInterval(refreshStatus, 30000);
+    </script>
+</body>
+</html> 

@@ -26,6 +26,11 @@ const server = http.createServer(app);
 // Create parser instance
 const parser = new GalileoskyParser();
 
+// Global data references for mobile application (in-memory arrays)
+global.parsedData = [];
+global.devices = new Map();
+global.lastIMEI = null;
+
 app.use(cors(config.http.cors)); // Apply CORS middleware
 app.use(express.json());
 
@@ -78,6 +83,7 @@ app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/mapping', require('./routes/mapping'));
 app.use('/api/records', recordsRouter);
+app.use('/api/peer', require('./routes/peer'));
 
 // TCP Server for device connections
 const tcpServer = net.createServer((socket) => {
