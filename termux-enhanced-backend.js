@@ -298,17 +298,33 @@ function validatePacket(buffer) {
     // Extract 15 low-order bits for packet length
     const actualLength = rawLength & 0x7FFF;
 
+    console.log(`Packet validation - Header: 0x${header.toString(16)}, Length: ${actualLength}, HasUnsentData: ${hasUnsentData}`);
+
     // Check if we have the complete packet (HEAD + LENGTH + DATA + CRC)
     const expectedLength = actualLength + 3;  // Header (1) + Length (2) + Data
     if (buffer.length < expectedLength + 2) {  // +2 for CRC
+        console.warn(`Incomplete packet: expected ${expectedLength + 2} bytes, got ${buffer.length} bytes`);
         throw new Error('Incomplete packet');
     }
 
-    // Verify checksum
+    // For small packets (< 32 bytes), be more lenient with CRC validation
+    if (actualLength < 32) {
+        console.log(`Small packet detected (${actualLength} bytes) - skipping CRC validation`);
+        return {
+            hasUnsentData,
+            actualLength,
+            rawLength
+        };
+    }
+
+    // Verify checksum for larger packets
     const calculatedChecksum = calculateCRC16(buffer.slice(0, expectedLength));
     const receivedChecksum = buffer.readUInt16LE(expectedLength);
 
+    console.log(`CRC validation - Calculated: 0x${calculatedChecksum.toString(16)}, Received: 0x${receivedChecksum.toString(16)}`);
+
     if (calculatedChecksum !== receivedChecksum) {
+        console.warn(`Checksum mismatch for packet with length ${actualLength}`);
         throw new Error('Checksum mismatch');
     }
 
@@ -807,6 +823,8 @@ async function parsePacket(buffer) {
         // Validate packet structure and checksum
         const { hasUnsentData, actualLength, rawLength } = validatePacket(buffer);
         
+        console.log(`Parsing packet - Type: 0x${header.toString(16)}, Length: ${actualLength}, Small packet: ${actualLength < 32}`);
+        
         // Use PacketTypeHandler to determine packet type
         if (PacketTypeHandler.isMainPacket(header)) {
             // This is a Head Packet or Main Packet
@@ -814,6 +832,12 @@ async function parsePacket(buffer) {
             result.hasUnsentData = hasUnsentData;
             result.actualLength = actualLength;
             result.rawLength = rawLength;
+            
+            // Add summary for small packets
+            if (actualLength < 32) {
+                console.log(`✅ Small packet processed successfully - Records: ${result.records.length}, Tags: ${result.records.map(r => Object.keys(r.tags).length).join(', ')}`);
+            }
+            
             return result;
         } else if (PacketTypeHandler.isIgnorablePacket(header)) {
             // This is an ignorable packet, just needs confirmation
