@@ -1329,6 +1329,24 @@ function handleAPIRequest(req, res) {
             
             res.writeHead(200);
             res.end(JSON.stringify(trackingData));
+        } else if (pathname.match(/^\/api\/data\/(.+)\/export$/)) {
+            const deviceId = pathname.match(/^\/api\/data\/(.+)\/export$/)[1];
+            const startDate = new Date(parsedUrl.query.startDate);
+            const endDate = new Date(parsedUrl.query.endDate);
+            
+            // Filter data for the specific device and time range
+            const exportData = parsedData.filter(record => {
+                const recordDate = new Date(record.timestamp);
+                return record.deviceId === deviceId && 
+                       recordDate >= startDate && 
+                       recordDate <= endDate;
+            });
+            
+            // Sort by timestamp
+            exportData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            res.writeHead(200);
+            res.end(JSON.stringify(exportData));
         } else if (pathname === '/api/data/add' && req.method === 'POST') {
             let body = '';
             req.on('data', chunk => {
