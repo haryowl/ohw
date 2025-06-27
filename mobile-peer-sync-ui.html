@@ -399,7 +399,6 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script>
         // Global variables
         let socket = null;
@@ -447,34 +446,13 @@
 
         // Initialize Socket.IO connection
         function initSocketIO() {
-            try {
-                socket = io();
-                
-                socket.on('connect', () => {
-                    isConnected = true;
-                    connectionStatus.textContent = 'Connected to server';
-                    connectionStatus.className = 'status success';
-                    log('success', 'Connected to server via WebSocket');
-                });
-                
-                socket.on('disconnect', () => {
-                    isConnected = false;
-                    connectionStatus.textContent = 'Disconnected from server';
-                    connectionStatus.className = 'status error';
-                    log('error', 'Disconnected from server');
-                });
-                
-                socket.on('newData', (data) => {
-                    handleNewData(data);
-                });
-                
-                socket.on('connect_error', (error) => {
-                    log('error', `Connection error: ${error.message}`);
-                });
-                
-            } catch (error) {
-                log('error', `Socket.IO initialization failed: ${error.message}`);
-            }
+            // Socket.IO is not needed for peer sync UI
+            // Peer sync uses direct HTTP requests
+            console.log('📱 Peer sync UI - using direct HTTP requests');
+            isConnected = true;
+            connectionStatus.textContent = 'Ready for peer sync';
+            connectionStatus.className = 'status success';
+            log('success', 'Peer sync UI ready - using direct HTTP requests');
         }
 
         // Get server IP address
@@ -563,16 +541,39 @@
             log('info', `Testing connection to: ${url}`);
             
             try {
-                const response = await fetch(`${url}/api/health`, {
-                    method: 'GET',
-                    timeout: 5000
-                });
+                // Test multiple endpoints
+                const endpoints = [
+                    '/api/status',
+                    '/peer/status',
+                    '/mobile-peer-sync-ui.html'
+                ];
                 
-                if (response.ok) {
-                    log('success', `Connection successful to ${url}`);
-                } else {
-                    log('error', `Connection failed to ${url}`);
+                let successCount = 0;
+                
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(`${url}${endpoint}`, {
+                            method: 'GET',
+                            timeout: 5000
+                        });
+                        
+                        if (response.ok) {
+                            log('success', `✅ ${endpoint} - OK`);
+                            successCount++;
+                        } else {
+                            log('warning', `⚠️ ${endpoint} - HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        log('error', `❌ ${endpoint} - ${error.message}`);
+                    }
                 }
+                
+                if (successCount > 0) {
+                    log('success', `Connection test completed: ${successCount}/${endpoints.length} endpoints working`);
+                } else {
+                    log('error', 'All connection tests failed. Check if peer server is running.');
+                }
+                
             } catch (error) {
                 log('error', `Connection test failed: ${error.message}`);
             }
