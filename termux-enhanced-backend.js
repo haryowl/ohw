@@ -1580,22 +1580,28 @@ function startHTTPServer() {
         logger.info(`Frontend available at: http://${ipAddress}:${config.httpPort}`);
         logger.info(`API available at: http://${ipAddress}:${config.httpPort}/api/`);
         logger.info(`Socket.IO available at: http://${ipAddress}:${config.httpPort}`);
-        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
+        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:3001/mobile-peer-sync-ui.html`);
         
         // Display server information
         console.log('');
         console.log('🎉 SERVER STARTED SUCCESSFULLY!');
         console.log('================================');
         console.log(`📱 Mobile Interface: http://${ipAddress}:${config.httpPort}`);
-        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
+        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:3001/mobile-peer-sync-ui.html`);
         console.log(`📡 TCP Server: ${ipAddress}:${config.tcpPort}`);
         console.log(`💾 Data Directory: ${dataDir}`);
         console.log(`📋 Logs Directory: ${logsDir}`);
         console.log('');
         console.log('📊 Server Status:');
         console.log(`   Records: ${parsedData.length}`);
-        console.log(`   Devices: ${devices.size}`);
+        console.log(`   Total Devices: ${devices.size}`);
+        console.log(`   Active Connections: ${activeConnections.size}`);
         console.log(`   Last IMEI: ${lastIMEI || 'None'}`);
+        console.log('');
+        console.log('🔧 Multi-Device Support: Enabled');
+        console.log('   - Each device connection tracked separately');
+        console.log('   - IMEI mapping per connection');
+        console.log('   - Real-time device status monitoring');
         console.log('');
         console.log('⏹  Press Ctrl+C to stop the server');
         console.log('');

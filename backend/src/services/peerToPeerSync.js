@@ -30,6 +30,7 @@ class PeerToPeerSync {
             this.isServerMode = true;
             console.log(`✅ Peer server started on port ${this.port}`);
             console.log(`📡 Other devices can connect to: http://YOUR_IP:${this.port}/peer/sync`);
+            console.log(`🌐 Mobile Peer Sync UI: http://YOUR_IP:${this.port}/mobile-peer-sync-ui.html`);
         });
 
         this.peerServer.on('error', (error) => {
@@ -70,6 +71,86 @@ class PeerToPeerSync {
 
         console.log(`📱 Peer request: ${req.method} ${pathname}`);
 
+        // Serve mobile peer sync UI
+        if (pathname === '/' || pathname === '/mobile-peer-sync-ui.html') {
+            const fs = require('fs');
+            const path = require('path');
+            const uiPath = path.join(__dirname, '../../../mobile-peer-sync-ui.html');
+            
+            if (fs.existsSync(uiPath)) {
+                const content = fs.readFileSync(uiPath, 'utf8');
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(content);
+                console.log(`📱 Served mobile peer sync UI`);
+            } else {
+                res.writeHead(404, { 'Content-Type': 'text/html' });
+                res.end('<h1>Mobile Peer Sync UI not found</h1><p>File: mobile-peer-sync-ui.html</p>');
+            }
+            return;
+        }
+
+        // Serve API endpoints for the UI
+        if (pathname === '/api/status') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                status: 'running',
+                tcpConnections: 0, // This is handled by main backend
+                totalDevices: devices.size,
+                activeDevices: devices.size,
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                timestamp: new Date().toISOString()
+            }));
+            return;
+        }
+
+        if (pathname === '/api/data') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                records: parsedData.slice(-100), // Last 100 records
+                devices: Array.from(devices.entries()).map(([id, info]) => ({
+                    deviceId: id,
+                    lastSeen: info.lastSeen,
+                    totalRecords: info.totalRecords,
+                    connectionId: info.clientAddress || info.connectionId,
+                    lastLocation: info.lastLocation,
+                    isConnected: true // Assume connected since we have data
+                })),
+                lastIMEI: lastIMEI,
+                totalRecords: parsedData.length,
+                totalDevices: devices.size,
+                activeConnections: devices.size
+            }));
+            return;
+        }
+
+        if (pathname === '/api/data/clear' && req.method === 'POST') {
+            parsedData.length = 0;
+            devices.clear();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'Data cleared successfully' }));
+            return;
+        }
+
+        if (pathname === '/api/data/export' && req.method === 'GET') {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                records: parsedData,
+                devices: Object.fromEntries(devices),
+                lastIMEI: lastIMEI,
+                totalRecords: parsedData.length,
+                totalDevices: devices.size
+            };
+            
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Content-Disposition': `attachment; filename="galileosky_data_${new Date().toISOString().replace(/[:.]/g, '-')}.json"`
+            });
+            res.end(JSON.stringify(exportData, null, 2));
+            return;
+        }
+
+        // Peer sync endpoints
         if (pathname === '/peer/status') {
             // Return device status
             res.writeHead(200, { 'Content-Type': 'application/json' });
