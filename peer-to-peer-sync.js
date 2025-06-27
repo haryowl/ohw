@@ -179,6 +179,12 @@ class PeerToPeerSync {
         }
 
         console.log(`📱 Merging ${peerData.records.length} records from peer device ${peerData.deviceId}`);
+        console.log(`📱 Peer data details:`, {
+            totalRecords: peerData.totalRecords,
+            actualRecordsLength: peerData.records.length,
+            devices: peerData.devices ? Object.keys(peerData.devices) : [],
+            lastIMEI: peerData.lastIMEI
+        });
 
         // Create a map of existing records by unique key (timestamp + deviceId)
         const existingRecords = new Map();

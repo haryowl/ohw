@@ -707,6 +707,14 @@
                 if (dataResponse.ok) {
                     currentData = await dataResponse.json();
                     log('info', `📊 Current data: ${currentData.totalRecords || 0} records, ${currentData.totalDevices || 0} devices`);
+                    
+                    // Debug: Log the actual records count
+                    console.log('📱 Current data details:', {
+                        totalRecords: currentData.totalRecords,
+                        actualRecordsLength: currentData.records ? currentData.records.length : 0,
+                        devices: currentData.devices ? Object.keys(currentData.devices) : [],
+                        lastIMEI: currentData.lastIMEI
+                    });
                 } else {
                     log('error', 'Failed to get current data for sync');
                     syncInProgress = false;
