@@ -1594,6 +1594,12 @@ function startHTTPServer() {
         // Serve static files
         let filePath = pathname === '/' ? './simple-frontend.html' : '.' + pathname;
         
+        // Special handling for mobile peer sync UI
+        if (pathname === '/mobile-peer-sync-ui.html') {
+            filePath = './mobile-peer-sync-ui.html';
+            console.log('📱 Served mobile peer sync UI');
+        }
+        
         // Security: prevent directory traversal
         if (filePath.includes('..')) {
             res.writeHead(403);
@@ -1630,14 +1636,14 @@ function startHTTPServer() {
         logger.info(`Frontend available at: http://${ipAddress}:${config.httpPort}`);
         logger.info(`API available at: http://${ipAddress}:${config.httpPort}/api/`);
         logger.info(`Socket.IO available at: http://${ipAddress}:${config.httpPort}`);
-        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:${config.peerSyncPort}/mobile-peer-sync-ui.html`);
+        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
         
         // Display server information
         console.log('');
         console.log('🎉 SERVER STARTED SUCCESSFULLY!');
         console.log('================================');
         console.log(`📱 Mobile Interface: http://${ipAddress}:${config.httpPort}`);
-        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:${config.peerSyncPort}/mobile-peer-sync-ui.html`);
+        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
         console.log(`📡 TCP Server: ${ipAddress}:${config.tcpPort}`);
         console.log(`💾 Data Directory: ${dataDir}`);
         console.log(`📋 Logs Directory: ${logsDir}`);
