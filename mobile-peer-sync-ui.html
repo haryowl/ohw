@@ -200,6 +200,66 @@
             font-size: 0.8em;
         }
 
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .device-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .device-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .device-item.connected {
+            border-left: 4px solid #28a745;
+        }
+
+        .device-item.disconnected {
+            border-left: 4px solid #dc3545;
+        }
+
+        .device-details {
+            flex: 1;
+        }
+
+        .device-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .device-status {
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+
+        .device-records {
+            font-size: 0.8em;
+            color: #667eea;
+            font-weight: 600;
+        }
+
         /* Mobile-specific optimizations */
         @media (max-width: 480px) {
             body {
@@ -244,6 +304,30 @@
         </div>
 
         <div class="content">
+            <!-- Sync Status Bar -->
+            <div class="section" id="syncStatusSection" style="display: none;">
+                <h3>🔄 Sync Status</h3>
+                <div class="input-group">
+                    <label>Sync Status:</label>
+                    <div id="syncStatusBar" class="status info">Ready to sync</div>
+                </div>
+                <div class="input-group">
+                    <label>Progress:</label>
+                    <div class="progress-bar">
+                        <div id="syncProgress" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="syncProgressText">0%</div>
+                </div>
+                <div class="input-group">
+                    <label>Last Sync Time:</label>
+                    <div id="lastSyncTime" class="device-info">Never</div>
+                </div>
+                <div class="input-group">
+                    <label>Sync Results:</label>
+                    <div id="syncResults" class="device-info">No sync performed yet</div>
+                </div>
+            </div>
+
             <!-- Server Status Section -->
             <div class="section">
                 <h3>🖥️ Server Status</h3>
@@ -286,10 +370,22 @@
                     <div id="deviceCount" class="device-info">0</div>
                 </div>
                 <div class="input-group">
+                    <label>Active Connections:</label>
+                    <div id="activeConnections" class="device-info">0</div>
+                </div>
+                <div class="input-group">
                     <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
                     <button class="btn btn-success" onclick="exportData()">📥 Export Data</button>
-                    <button class="btn btn-warning" onclick="syncData()">🔄 Sync Data</button>
+                    <button class="btn btn-warning" onclick="syncData()" id="syncButton">🔄 Sync Data</button>
                     <button class="btn btn-danger" onclick="clearData()">🗑️ Clear Data</button>
+                </div>
+            </div>
+
+            <!-- Device List Section -->
+            <div class="section">
+                <h3>📱 Connected Devices</h3>
+                <div id="deviceList" class="device-list">
+                    <div class="device-info">No devices connected</div>
                 </div>
             </div>
 
@@ -310,15 +406,25 @@
         let peers = [];
         let isConnected = false;
         let lastDataUpdate = null;
+        let syncInProgress = false;
 
         // DOM elements
+        const syncStatusSection = document.getElementById('syncStatusSection');
+        const syncStatusBar = document.getElementById('syncStatusBar');
+        const syncProgress = document.getElementById('syncProgress');
+        const syncProgressText = document.getElementById('syncProgressText');
+        const lastSyncTime = document.getElementById('lastSyncTime');
+        const syncResults = document.getElementById('syncResults');
         const connectionStatus = document.getElementById('connectionStatus');
         const serverIP = document.getElementById('serverIP');
         const lastUpdate = document.getElementById('lastUpdate');
         const peerUrl = document.getElementById('peerUrl');
         const recordCount = document.getElementById('recordCount');
         const deviceCount = document.getElementById('deviceCount');
+        const activeConnections = document.getElementById('activeConnections');
+        const deviceList = document.getElementById('deviceList');
         const activityLog = document.getElementById('activityLog');
+        const syncButton = document.getElementById('syncButton');
 
         // Initialize the application
         function init() {
@@ -475,15 +581,25 @@
         // Refresh data from server
         async function refreshData() {
             try {
-                const response = await fetch('/api/data/latest?limit=100');
-                if (response.ok) {
-                    const data = await response.json();
+                // Get data statistics
+                const dataResponse = await fetch('/api/data');
+                if (dataResponse.ok) {
+                    const data = await dataResponse.json();
                     updateDataStats(data);
+                    updateDeviceList(data.devices || []);
                     lastDataUpdate = new Date();
                     lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
-                    log('success', `Refreshed data: ${data.length} records`);
+                    log('success', `Refreshed data: ${data.totalRecords || 0} records, ${data.totalDevices || 0} devices`);
                 } else {
                     log('error', 'Failed to refresh data');
+                }
+
+                // Get server status
+                const statusResponse = await fetch('/api/status');
+                if (statusResponse.ok) {
+                    const status = await statusResponse.json();
+                    activeConnections.textContent = status.activeConnections || 0;
+                    log('info', `Server status: ${status.activeConnections || 0} active connections`);
                 }
             } catch (error) {
                 log('error', `Refresh error: ${error.message}`);
@@ -515,31 +631,128 @@
 
         // Sync data with peers
         async function syncData() {
+            if (syncInProgress) {
+                log('warning', 'Sync already in progress, please wait...');
+                return;
+            }
+
             if (peers.length === 0) {
                 log('warning', 'No peers configured for sync');
                 return;
             }
-            
-            log('info', `Starting sync with ${peers.length} peers`);
-            
-            for (const peer of peers) {
-                if (peer.status === 'online') {
-                    try {
-                        const response = await fetch(`${peer.url}/api/data/latest?limit=100`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            log('success', `Synced ${data.length} records from ${peer.name}`);
-                            peer.lastSync = new Date().toISOString();
-                        } else {
-                            log('error', `Failed to sync with ${peer.name}`);
-                        }
-                    } catch (error) {
-                        log('error', `Sync error with ${peer.name}: ${error.message}`);
-                    }
-                }
+
+            // Show sync status section
+            syncStatusSection.style.display = 'block';
+            syncInProgress = true;
+            syncButton.disabled = true;
+            syncButton.textContent = '🔄 Syncing...';
+
+            // Initialize sync progress
+            updateSyncProgress(0, 'Initializing sync...');
+            syncStatusBar.textContent = 'Starting sync...';
+            syncStatusBar.className = 'status info';
+
+            const onlinePeers = peers.filter(p => p.status === 'online');
+            if (onlinePeers.length === 0) {
+                updateSyncProgress(100, 'No online peers available');
+                syncStatusBar.textContent = 'No online peers available';
+                syncStatusBar.className = 'status warning';
+                syncInProgress = false;
+                syncButton.disabled = false;
+                syncButton.textContent = '🔄 Sync Data';
+                return;
             }
+
+            log('info', `Starting sync with ${onlinePeers.length} online peers`);
             
-            savePeers();
+            let totalNewRecords = 0;
+            let successfulSyncs = 0;
+            let failedSyncs = 0;
+
+            for (let i = 0; i < onlinePeers.length; i++) {
+                const peer = onlinePeers[i];
+                const progress = Math.round(((i + 1) / onlinePeers.length) * 100);
+                
+                updateSyncProgress(progress, `Syncing with ${peer.name}...`);
+                syncStatusBar.textContent = `Syncing with ${peer.name}...`;
+                
+                try {
+                    log('info', `Syncing with peer: ${peer.name} (${peer.url})`);
+                    
+                    // Perform peer sync using the peer sync endpoint
+                    const response = await fetch(`${peer.url}/peer/sync`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            deviceId: 'mobile-peer-sync-ui',
+                            records: [], // Will be filled by server
+                            devices: {},
+                            lastIMEI: null,
+                            exportTime: new Date().toISOString()
+                        }),
+                        timeout: 30000
+                    });
+
+                    if (response.ok) {
+                        const syncResult = await response.json();
+                        
+                        if (syncResult.success) {
+                            const newRecords = syncResult.syncResult?.newRecords || 0;
+                            totalNewRecords += newRecords;
+                            successfulSyncs++;
+                            
+                            log('success', `✅ Sync with ${peer.name} successful: ${newRecords} new records`);
+                            peer.lastSync = new Date().toISOString();
+                            
+                            // Update sync results
+                            syncResults.textContent = `✅ ${successfulSyncs} successful, ${failedSyncs} failed, ${totalNewRecords} new records`;
+                        } else {
+                            failedSyncs++;
+                            log('error', `❌ Sync with ${peer.name} failed: ${syncResult.error || 'Unknown error'}`);
+                        }
+                    } else {
+                        failedSyncs++;
+                        log('error', `❌ HTTP error syncing with ${peer.name}: ${response.status}`);
+                    }
+                } catch (error) {
+                    failedSyncs++;
+                    log('error', `❌ Sync error with ${peer.name}: ${error.message}`);
+                }
+
+                // Small delay between syncs
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Final sync status
+            updateSyncProgress(100, 'Sync completed');
+            
+            if (successfulSyncs > 0) {
+                syncStatusBar.textContent = `✅ Sync Complete: ${successfulSyncs} successful, ${totalNewRecords} new records`;
+                syncStatusBar.className = 'status success';
+                lastSyncTime.textContent = new Date().toLocaleString();
+                
+                log('success', `🎉 Sync completed successfully!`);
+                log('success', `📊 Results: ${successfulSyncs} successful syncs, ${totalNewRecords} new records`);
+                
+                // Refresh data to show updated counts
+                await refreshData();
+            } else {
+                syncStatusBar.textContent = `❌ Sync Failed: All ${failedSyncs} attempts failed`;
+                syncStatusBar.className = 'status error';
+                log('error', `❌ Sync failed: All ${failedSyncs} attempts failed`);
+            }
+
+            // Reset sync state
+            syncInProgress = false;
+            syncButton.disabled = false;
+            syncButton.textContent = '🔄 Sync Data';
+            
+            // Hide sync status after 5 seconds
+            setTimeout(() => {
+                syncStatusSection.style.display = 'none';
+            }, 5000);
         }
 
         // Clear data
@@ -574,10 +787,43 @@
             refreshData();
         }
 
+        // Update sync progress
+        function updateSyncProgress(percentage, text) {
+            syncProgress.style.width = `${percentage}%`;
+            syncProgressText.textContent = `${percentage}% - ${text}`;
+        }
+
+        // Update device list
+        function updateDeviceList(devices) {
+            if (!devices || devices.length === 0) {
+                deviceList.innerHTML = '<div class="device-info">No devices connected</div>';
+                return;
+            }
+
+            deviceList.innerHTML = '';
+            devices.forEach(device => {
+                const deviceItem = document.createElement('div');
+                deviceItem.className = `device-item ${device.isConnected ? 'connected' : 'disconnected'}`;
+                
+                const statusText = device.isConnected ? '🟢 Connected' : '🔴 Disconnected';
+                const lastSeen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never';
+                
+                deviceItem.innerHTML = `
+                    <div class="device-details">
+                        <div class="device-name">📱 ${device.deviceId}</div>
+                        <div class="device-status">${statusText} • Last seen: ${lastSeen}</div>
+                    </div>
+                    <div class="device-records">${device.totalRecords || 0} records</div>
+                `;
+                
+                deviceList.appendChild(deviceItem);
+            });
+        }
+
         // Update data statistics
         function updateDataStats(data) {
-            recordCount.textContent = data.length || 0;
-            deviceCount.textContent = new Set(data.map(d => d.deviceId)).size || 0;
+            recordCount.textContent = data.totalRecords || 0;
+            deviceCount.textContent = data.totalDevices || 0;
         }
 
         // Save peers to localStorage
