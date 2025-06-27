@@ -1,8 +1,8 @@
 // frontend/src/services/api.js
 
-const API_BASE_URL = "http://192.168.1.114:3000"; // Use your server's LAN IP and backend port
+const API_BASE_URL = "http://192.168.1.114:3001"; // Use your server's LAN IP and backend port
 
-export const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+export const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 export async function fetchDashboardData() {
   const response = await fetch(`${BASE_URL}/api/dashboard`);

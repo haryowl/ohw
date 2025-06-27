@@ -196,8 +196,8 @@ function stopAutoSave() {
 // Configuration
 const config = {
     tcpPort: process.env.TCP_PORT || 3003,
-    httpPort: process.env.HTTP_PORT || 3000, // Changed to 3000 to avoid conflict with peer sync
-    peerSyncPort: process.env.PEER_SYNC_PORT || 3001, // Peer sync port
+    httpPort: process.env.HTTP_PORT || 3001, // Changed back to 3001 to restore original working config
+    peerSyncPort: process.env.PEER_SYNC_PORT || 3002, // Peer sync port moved to 3002 to avoid conflict
     host: '0.0.0.0', // Keep as 0.0.0.0 for listening on all interfaces
     maxConnections: 100,
     connectionTimeout: 30000,
@@ -1595,14 +1595,14 @@ function startHTTPServer() {
         logger.info(`Frontend available at: http://${ipAddress}:${config.httpPort}`);
         logger.info(`API available at: http://${ipAddress}:${config.httpPort}/api/`);
         logger.info(`Socket.IO available at: http://${ipAddress}:${config.httpPort}`);
-        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:3001/mobile-peer-sync-ui.html`);
+        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:${config.peerSyncPort}/mobile-peer-sync-ui.html`);
         
         // Display server information
         console.log('');
         console.log('🎉 SERVER STARTED SUCCESSFULLY!');
         console.log('================================');
         console.log(`📱 Mobile Interface: http://${ipAddress}:${config.httpPort}`);
-        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:3001/mobile-peer-sync-ui.html`);
+        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:${config.peerSyncPort}/mobile-peer-sync-ui.html`);
         console.log(`📡 TCP Server: ${ipAddress}:${config.tcpPort}`);
         console.log(`💾 Data Directory: ${dataDir}`);
         console.log(`📋 Logs Directory: ${logsDir}`);
