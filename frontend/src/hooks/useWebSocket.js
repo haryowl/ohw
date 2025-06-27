@@ -6,7 +6,7 @@ const useWebSocket = (url, onMessage) => {
   const ws = useRef(null);
 
   useEffect(() => {
-    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3001/ws';
+    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3000/ws';
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {

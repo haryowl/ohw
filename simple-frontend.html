@@ -697,6 +697,9 @@
             setTimeout(() => {
                 connectSocket();
             }, 2000); // Wait 2 seconds for backend to be ready
+            
+            // Start periodic status check
+            startStatusCheck();
         }
 
         function initializeMaps() {
@@ -1178,6 +1181,9 @@
                 dataRecords = dataRecords.slice(0, config.maxRecords);
             }
             
+            // Update connection status to show devices are actively sending data
+            updateStatus(true);
+            
             // Update display
             updateCurrentData();
             updateMap(data);
@@ -1536,6 +1542,27 @@
             } catch (err) {
                 alert('Export failed: ' + err.message);
             }
+        }
+
+        // Periodic status check to update connection status based on active devices
+        function startStatusCheck() {
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${config.apiUrl}/api/health`);
+                    if (response.ok) {
+                        const health = await response.json();
+                        // Update status based on active connections
+                        if (health.activeConnections > 0) {
+                            updateStatus(true);
+                        } else if (dataRecords.length === 0) {
+                            // Only show disconnected if no recent data and no active connections
+                            updateStatus(false);
+                        }
+                    }
+                } catch (error) {
+                    console.log('Status check failed:', error.message);
+                }
+            }, 5000); // Check every 5 seconds
         }
 
         // Cleanup on page unload

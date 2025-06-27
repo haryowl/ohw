@@ -52,7 +52,7 @@ const DeviceDetail = () => {
     }
   };
 
-  const ws = useWebSocket('ws://localhost:3001', handleWebSocketMessage);
+  const ws = useWebSocket('ws://localhost:3000', handleWebSocketMessage);
 
   useEffect(() => {
     loadDeviceData();

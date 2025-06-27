@@ -1101,6 +1101,13 @@ function addParsedData(data, clientAddress = null) {
         console.log(`🔍 Tags found: ${data.records.map(r => Object.keys(r.tags).length).join(', ')}`);
         console.log(`💾 Storage: ${parsedData.length}/${MAX_RECORDS} records in memory`);
         console.log(`📱 Active devices: ${devices.size}`);
+        
+        // Emit latest data to all connected Socket.IO clients
+        if (parsedData.length > 0) {
+            io.emit('deviceData', parsedData[0]);
+            io.emit('deviceUpdate', parsedData[0]);
+            console.log('📡 Emitted device data to Socket.IO clients');
+        }
     }
 }
 
