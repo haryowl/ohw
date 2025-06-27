@@ -670,6 +670,28 @@
             let successfulSyncs = 0;
             let failedSyncs = 0;
 
+            // Get current data from server
+            let currentData = null;
+            try {
+                const dataResponse = await fetch('/api/data');
+                if (dataResponse.ok) {
+                    currentData = await dataResponse.json();
+                    log('info', `📊 Current data: ${currentData.totalRecords || 0} records, ${currentData.totalDevices || 0} devices`);
+                } else {
+                    log('error', 'Failed to get current data for sync');
+                    syncInProgress = false;
+                    syncButton.disabled = false;
+                    syncButton.textContent = '🔄 Sync Data';
+                    return;
+                }
+            } catch (error) {
+                log('error', `Failed to get current data: ${error.message}`);
+                syncInProgress = false;
+                syncButton.disabled = false;
+                syncButton.textContent = '🔄 Sync Data';
+                return;
+            }
+
             for (let i = 0; i < onlinePeers.length; i++) {
                 const peer = onlinePeers[i];
                 const progress = Math.round(((i + 1) / onlinePeers.length) * 100);
@@ -680,7 +702,7 @@
                 try {
                     log('info', `Syncing with peer: ${peer.name} (${peer.url})`);
                     
-                    // Perform peer sync using the peer sync endpoint
+                    // Perform peer sync using the peer sync endpoint with ACTUAL DATA
                     const response = await fetch(`${peer.url}/peer/sync`, {
                         method: 'POST',
                         headers: {
@@ -688,9 +710,9 @@
                         },
                         body: JSON.stringify({
                             deviceId: 'mobile-peer-sync-ui',
-                            records: [], // Will be filled by server
-                            devices: {},
-                            lastIMEI: null,
+                            records: currentData.records || [], // ✅ SEND ACTUAL RECORDS
+                            devices: currentData.devices || {}, // ✅ SEND ACTUAL DEVICES
+                            lastIMEI: currentData.lastIMEI || null, // ✅ SEND ACTUAL LAST IMEI
                             exportTime: new Date().toISOString()
                         }),
                         timeout: 30000
@@ -705,6 +727,8 @@
                             successfulSyncs++;
                             
                             log('success', `✅ Sync with ${peer.name} successful: ${newRecords} new records`);
+                            log('info', `📤 Sent: ${currentData.totalRecords || 0} records to peer`);
+                            log('info', `📥 Received: ${newRecords} new records from peer`);
                             peer.lastSync = new Date().toISOString();
                             
                             // Update sync results
