@@ -509,7 +509,7 @@
         // Test peer connection
         async function testPeerConnection(peer) {
             try {
-                const response = await fetch(`${peer.url}/api/health`, {
+                const response = await fetch(`${peer.url}/api/status`, {
                     method: 'GET',
                     timeout: 5000
                 });
