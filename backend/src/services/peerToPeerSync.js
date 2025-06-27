@@ -22,8 +22,13 @@ class PeerToPeerSync {
 
         console.log(`📱 Starting peer server on port ${this.port}...`);
 
+        // Store references to the main backend's data
+        this.parsedData = parsedData;
+        this.devices = devices;
+        this.lastIMEI = lastIMEI;
+
         this.peerServer = http.createServer((req, res) => {
-            this.handlePeerRequest(req, res, parsedData, devices, lastIMEI);
+            this.handlePeerRequest(req, res, this.parsedData, this.devices, this.lastIMEI);
         });
 
         this.peerServer.listen(this.port, '0.0.0.0', () => {
@@ -114,7 +119,7 @@ class PeerToPeerSync {
                     totalRecords: info.totalRecords,
                     connectionId: info.clientAddress || info.connectionId,
                     lastLocation: info.lastLocation,
-                    isConnected: true // Assume connected since we have data
+                    isConnected: info.clientAddress ? true : false // Check if device has a client address
                 })),
                 lastIMEI: lastIMEI,
                 totalRecords: parsedData.length,

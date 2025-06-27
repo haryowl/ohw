@@ -15,6 +15,9 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const { networkInterfaces } = require('os');
 
+// Import peer sync service
+const PeerToPeerSync = require('./backend/src/services/peerToPeerSync');
+
 // Clear startup identification
 console.log('🚀 ========================================');
 console.log('🚀 GALILEOSKY ENHANCED BACKEND (FIXED)');
@@ -193,7 +196,8 @@ function stopAutoSave() {
 // Configuration
 const config = {
     tcpPort: process.env.TCP_PORT || 3003,
-    httpPort: process.env.HTTP_PORT || 3001,
+    httpPort: process.env.HTTP_PORT || 3000, // Changed to 3000 to avoid conflict with peer sync
+    peerSyncPort: process.env.PEER_SYNC_PORT || 3001, // Peer sync port
     host: '0.0.0.0', // Keep as 0.0.0.0 for listening on all interfaces
     maxConnections: 100,
     connectionTimeout: 30000,
@@ -251,6 +255,10 @@ const logger = {
 const activeConnections = new Map();
 let tcpServer = null;
 let httpServer = null;
+
+// Initialize peer sync service
+const deviceId = 'mobile-enhanced-' + Math.random().toString(36).substr(2, 9);
+const peerSync = new PeerToPeerSync(deviceId, config.peerSyncPort);
 
 // Tag definitions from tagDefinitions.js
 const tagDefinitions = {
@@ -1669,6 +1677,10 @@ loadData();
 
 // Start auto-save
 startAutoSave();
+
+// Start peer sync server
+logger.info('Starting peer sync server...');
+peerSync.startPeerServer(parsedData, devices, lastIMEI);
 
 // Start servers
 startTCPServer();
