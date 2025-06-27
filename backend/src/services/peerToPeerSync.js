@@ -265,6 +265,8 @@ class PeerToPeerSync {
         }
 
         console.log(`📱 Merging ${peerData.records.length} records from peer device ${peerData.deviceId}`);
+        console.log(`📱 Current devices before merge:`, Array.from(devices.entries()));
+        console.log(`📱 Peer devices to merge:`, peerData.devices);
 
         // Create a map of existing records by unique key (timestamp + deviceId)
         const existingRecords = new Map();
@@ -273,10 +275,13 @@ class PeerToPeerSync {
             existingRecords.set(key, record);
         });
 
-        // Merge devices
+        // Merge devices - use IMEI as key, not generic device ID
         if (peerData.devices) {
             Object.entries(peerData.devices).forEach(([key, value]) => {
-                devices.set(key, value);
+                // Check if this is a valid IMEI (15 digits) or use the key as is
+                const deviceKey = key;
+                console.log(`📱 Merging device with key: ${deviceKey}`, value);
+                devices.set(deviceKey, value);
             });
         }
 
@@ -299,6 +304,7 @@ class PeerToPeerSync {
         parsedData.push(...mergedData);
 
         console.log(`📱 Merge complete: ${newRecordsCount} new records added, total: ${parsedData.length}`);
+        console.log(`📱 Devices after merge:`, Array.from(devices.entries()));
 
         return { newRecords: newRecordsCount };
     }

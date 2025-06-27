@@ -1466,7 +1466,7 @@ function handleAPIRequest(req, res) {
             }));
         } else if (pathname === '/api/data/clear' && req.method === 'POST') {
             // Clear all data
-            parsedData = [];
+            parsedData.length = 0;
             devices.clear();
             lastIMEI = null;
             
@@ -1479,7 +1479,7 @@ function handleAPIRequest(req, res) {
                 logger.error('Error deleting storage files:', { error: error.message });
             }
             
-            res.writeHead(200);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
                 success: true, 
                 message: 'All data cleared successfully'
@@ -1531,6 +1531,24 @@ function handleAPIRequest(req, res) {
             
             res.writeHead(200);
             res.end(JSON.stringify(storageInfo, null, 2));
+        } else if (pathname === '/api/data' && req.method === 'GET') {
+            // Return data in the format expected by peer sync
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                records: parsedData.slice(-100), // Last 100 records
+                devices: Array.from(devices.entries()).map(([id, info]) => ({
+                    deviceId: id,
+                    lastSeen: info.lastSeen,
+                    totalRecords: info.totalRecords,
+                    connectionId: info.clientAddress || info.connectionId,
+                    lastLocation: info.lastLocation,
+                    isConnected: info.clientAddress ? true : false
+                })),
+                lastIMEI: lastIMEI,
+                totalRecords: parsedData.length,
+                totalDevices: devices.size,
+                activeConnections: devices.size
+            }));
         } else {
             res.writeHead(404);
             res.end(JSON.stringify({ error: 'API endpoint not found' }));
@@ -1549,6 +1567,13 @@ function startHTTPServer() {
         const pathname = parsedUrl.pathname;
         
         logger.info(`${req.method} ${pathname}`);
+        
+        // Handle peer sync requests
+        if (pathname.startsWith('/peer/')) {
+            console.log(`📱 Peer request: ${req.method} ${pathname}`);
+            peerSync.handlePeerRequest(req, res, parsedData, devices, lastIMEI);
+            return;
+        }
         
         // Handle API requests
         if (pathname.startsWith('/api/')) {
