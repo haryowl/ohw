@@ -586,6 +586,15 @@
                 const dataResponse = await fetch('/api/data');
                 if (dataResponse.ok) {
                     const data = await dataResponse.json();
+                    
+                    // Debug: Log the device data structure
+                    console.log('📊 Received data from /api/data:', {
+                        totalRecords: data.totalRecords,
+                        totalDevices: data.totalDevices,
+                        devices: data.devices,
+                        lastIMEI: data.lastIMEI
+                    });
+                    
                     updateDataStats(data);
                     updateDeviceList(data.devices || []);
                     lastDataUpdate = new Date();
@@ -820,22 +829,31 @@
 
         // Update device list
         function updateDeviceList(devices) {
+            console.log('📱 updateDeviceList called with:', devices);
+            
             if (!devices || devices.length === 0) {
                 deviceList.innerHTML = '<div class="device-info">No devices connected</div>';
                 return;
             }
 
             deviceList.innerHTML = '';
-            devices.forEach(device => {
+            devices.forEach((device, index) => {
+                console.log(`📱 Processing device ${index}:`, device);
+                
                 const deviceItem = document.createElement('div');
                 deviceItem.className = `device-item ${device.isConnected ? 'connected' : 'disconnected'}`;
                 
                 const statusText = device.isConnected ? '🟢 Connected' : '🔴 Disconnected';
                 const lastSeen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never';
                 
+                // Use IMEI as device identifier, fallback to deviceId if IMEI not available
+                const deviceIdentifier = device.deviceId || device.imei || 'Unknown Device';
+                
+                console.log(`📱 Device ${index} identifier: ${deviceIdentifier}`);
+                
                 deviceItem.innerHTML = `
                     <div class="device-details">
-                        <div class="device-name">📱 ${device.deviceId}</div>
+                        <div class="device-name">📱 ${deviceIdentifier}</div>
                         <div class="device-status">${statusText} • Last seen: ${lastSeen}</div>
                     </div>
                     <div class="device-records">${device.totalRecords || 0} records</div>
