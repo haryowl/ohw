@@ -112,7 +112,7 @@ class PeerToPeerSync {
         if (pathname === '/api/data') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
-                records: parsedData.slice(-100), // Last 100 records
+                records: parsedData,
                 devices: Array.from(devices.entries()).map(([id, info]) => ({
                     deviceId: id,
                     lastSeen: info.lastSeen,
