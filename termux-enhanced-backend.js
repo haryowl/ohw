@@ -13,6 +13,7 @@ const url = require('url');
 const express = require('express');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const { networkInterfaces } = require('os');
 
 // Clear startup identification
 console.log('🚀 ========================================');
@@ -22,6 +23,24 @@ console.log('🚀 This is the ENHANCED backend with parsing fixes');
 console.log('🚀 Last updated: 2025-06-24');
 console.log('🚀 ========================================');
 console.log('');
+
+// Function to get IP address
+function getIpAddress() {
+    const nets = networkInterfaces();
+    
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            // Skip over non-IPv4 and internal addresses
+            if (net.family === 'IPv4' && !net.internal) {
+                return net.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+
+// Get IP address
+const ipAddress = getIpAddress();
 
 // Ensure logs and data directories exist
 const logsDir = path.join(__dirname, 'logs');
@@ -126,7 +145,7 @@ function stopAutoSave() {
 const config = {
     tcpPort: process.env.TCP_PORT || 3003,
     httpPort: process.env.HTTP_PORT || 3001,
-    host: '0.0.0.0',
+    host: '0.0.0.0', // Keep as 0.0.0.0 for listening on all interfaces
     maxConnections: 100,
     connectionTimeout: 30000,
     keepAliveTime: 60000
@@ -1212,6 +1231,7 @@ function startTCPServer() {
 
     tcpServer.listen(config.tcpPort, config.host, () => {
         logger.info(`TCP server listening on port ${config.tcpPort} (all interfaces)`);
+        logger.info(`TCP server accessible at: ${ipAddress}:${config.tcpPort}`);
     });
 
     tcpServer.on('error', (error) => {
@@ -1502,9 +1522,28 @@ function startHTTPServer() {
 
     httpServer.listen(config.httpPort, config.host, () => {
         logger.info(`HTTP server listening on ${config.host}:${config.httpPort}`);
-        logger.info(`Frontend available at: http://${config.host}:${config.httpPort}`);
-        logger.info(`API available at: http://${config.host}:${config.httpPort}/api/`);
-        logger.info(`Socket.IO available at: http://${config.host}:${config.httpPort}`);
+        logger.info(`Frontend available at: http://${ipAddress}:${config.httpPort}`);
+        logger.info(`API available at: http://${ipAddress}:${config.httpPort}/api/`);
+        logger.info(`Socket.IO available at: http://${ipAddress}:${config.httpPort}`);
+        logger.info(`Mobile Peer Sync UI: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
+        
+        // Display server information
+        console.log('');
+        console.log('🎉 SERVER STARTED SUCCESSFULLY!');
+        console.log('================================');
+        console.log(`📱 Mobile Interface: http://${ipAddress}:${config.httpPort}`);
+        console.log(`🌐 Peer Sync Interface: http://${ipAddress}:${config.httpPort}/mobile-peer-sync-ui.html`);
+        console.log(`📡 TCP Server: ${ipAddress}:${config.tcpPort}`);
+        console.log(`💾 Data Directory: ${dataDir}`);
+        console.log(`📋 Logs Directory: ${logsDir}`);
+        console.log('');
+        console.log('📊 Server Status:');
+        console.log(`   Records: ${parsedData.length}`);
+        console.log(`   Devices: ${devices.size}`);
+        console.log(`   Last IMEI: ${lastIMEI || 'None'}`);
+        console.log('');
+        console.log('⏹  Press Ctrl+C to stop the server');
+        console.log('');
     });
 
     httpServer.on('error', (error) => {
