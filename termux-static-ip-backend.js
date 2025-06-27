@@ -44,7 +44,7 @@ const DEVICES_FILE = path.join(dataDir, 'devices.json');
 const LAST_IMEI_FILE = path.join(dataDir, 'last_imei.json');
 
 // Configuration constants
-const MAX_RECORDS = 10000; // Maximum number of records to keep in memory and storage
+const MAX_RECORDS = 200000; // Maximum number of records to keep in memory and storage
 
 // Global variables for IMEI persistence
 let lastIMEI = null;
