@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galileosky Mobile Peer Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status-value {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .status-value.online {
+            color: #28a745;
+        }
+
+        .status-value.offline {
+            color: #dc3545;
+        }
+
+        .sync-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .sync-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .peer-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .peer-input input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .peer-input input:focus {
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .peer-list {
+            margin-top: 15px;
+        }
+
+        .peer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .peer-info {
+            flex: 1;
+        }
+
+        .peer-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .peer-status {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .peer-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .data-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .data-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .data-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .log-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+            background: white;
+        }
+
+        .log-entry.info {
+            border-left: 3px solid #667eea;
+        }
+
+        .log-entry.success {
+            border-left: 3px solid #28a745;
+        }
+
+        .log-entry.error {
+            border-left: 3px solid #dc3545;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px 15px;
+            }
+            
+            .content {
+                padding: 15px;
+            }
+            
+            .peer-input {
+                flex-direction: column;
+            }
+            
+            .data-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 Galileosky Mobile Peer Sync</h1>
+            <p>Real-time data synchronization between devices</p>
+        </div>
+
+        <div class="content">
+            <!-- Server Status -->
+            <div class="status-card">
+                <h3>🖥️ Server Status</h3>
+                <div class="status-item">
+                    <span class="status-label">Server Status:</span>
+                    <span class="status-value" id="serverStatus">Checking...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Connection:</span>
+                    <span class="status-value" id="connectionStatus">Disconnected</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Last Update:</span>
+                    <span class="status-value" id="lastUpdate">Never</span>
+                </div>
+            </div>
+
+            <!-- Peer Sync Section -->
+            <div class="sync-section">
+                <h3>🔄 Peer Synchronization</h3>
+                <div class="peer-input">
+                    <input type="text" id="peerUrl" placeholder="Enter peer URL (e.g., http://192.168.1.100:3001)" />
+                    <button class="btn btn-primary" id="addPeerBtn">Add Peer</button>
+                </div>
+                <div class="peer-list" id="peerList">
+                    <!-- Peer items will be added here -->
+                </div>
+            </div>
+
+            <!-- Data Section -->
+            <div class="data-section">
+                <h3>📊 Data Statistics</h3>
+                <div class="data-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRecords">0</div>
+                        <div class="stat-label">Records</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalDevices">0</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="activePeers">0</div>
+                        <div class="stat-label">Peers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="syncStatus">0%</div>
+                        <div class="stat-label">Sync</div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn btn-secondary" id="refreshDataBtn">🔄 Refresh Data</button>
+                    <button class="btn btn-success" id="exportDataBtn">📥 Export Data</button>
+                    <button class="btn btn-danger" id="clearDataBtn">🗑️ Clear Data</button>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="data-section">
+                <h3>📝 Activity Log</h3>
+                <div class="log-section" id="activityLog">
+                    <div class="log-entry info">System initialized. Waiting for connections...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Global variables
+        let socket = null;
+        let peers = [];
+        let isConnected = false;
+        let lastDataUpdate = null;
+
+        // DOM elements
+        const serverStatus = document.getElementById('serverStatus');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const peerUrl = document.getElementById('peerUrl');
+        const addPeerBtn = document.getElementById('addPeerBtn');
+        const peerList = document.getElementById('peerList');
+        const totalRecords = document.getElementById('totalRecords');
+        const totalDevices = document.getElementById('totalDevices');
+        const activePeers = document.getElementById('activePeers');
+        const syncStatus = document.getElementById('syncStatus');
+        const refreshDataBtn = document.getElementById('refreshDataBtn');
+        const exportDataBtn = document.getElementById('exportDataBtn');
+        const clearDataBtn = document.getElementById('clearDataBtn');
+        const activityLog = document.getElementById('activityLog');
+
+        // Initialize the application
+        function init() {
+            log('info', 'Initializing Mobile Peer Sync...');
+            
+            // Initialize Socket.IO connection
+            initSocketIO();
+            
+            // Load saved peers
+            loadPeers();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Initial data refresh
+            refreshData();
+            
+            log('success', 'Mobile Peer Sync initialized successfully');
+        }
+
+        // Initialize Socket.IO connection
+        function initSocketIO() {
+            try {
+                socket = io();
+                
+                socket.on('connect', () => {
+                    isConnected = true;
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.className = 'status-value online';
+                    serverStatus.textContent = 'Online';
+                    log('success', 'Connected to server');
+                });
+                
+                socket.on('disconnect', () => {
+                    isConnected = false;
+                    connectionStatus.textContent = 'Disconnected';
+                    connectionStatus.className = 'status-value offline';
+                    serverStatus.textContent = 'Offline';
+                    log('error', 'Disconnected from server');
+                });
+                
+                socket.on('newData', (data) => {
+                    handleNewData(data);
+                });
+                
+                socket.on('connect_error', (error) => {
+                    log('error', `Connection error: ${error.message}`);
+                });
+                
+            } catch (error) {
+                log('error', `Socket.IO initialization failed: ${error.message}`);
+            }
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            addPeerBtn.addEventListener('click', addPeer);
+            refreshDataBtn.addEventListener('click', refreshData);
+            exportDataBtn.addEventListener('click', exportData);
+            clearDataBtn.addEventListener('click', clearData);
+            
+            peerUrl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addPeer();
+                }
+            });
+        }
+
+        // Add a new peer
+        function addPeer() {
+            const url = peerUrl.value.trim();
+            if (!url) {
+                log('error', 'Please enter a peer URL');
+                return;
+            }
+            
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                log('error', 'Please enter a valid URL starting with http:// or https://');
+                return;
+            }
+            
+            // Check if peer already exists
+            if (peers.find(p => p.url === url)) {
+                log('error', 'Peer already exists');
+                return;
+            }
+            
+            const peer = {
+                id: Date.now().toString(),
+                url: url,
+                name: `Peer ${peers.length + 1}`,
+                status: 'connecting',
+                lastSync: null
+            };
+            
+            peers.push(peer);
+            savePeers();
+            renderPeers();
+            
+            log('info', `Adding peer: ${url}`);
+            
+            // Test connection
+            testPeerConnection(peer);
+        }
+
+        // Test peer connection
+        async function testPeerConnection(peer) {
+            try {
+                const response = await fetch(`${peer.url}/api/health`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    peer.status = 'online';
+                    peer.lastSync = new Date().toISOString();
+                    log('success', `Peer ${peer.name} is online`);
+                } else {
+                    peer.status = 'offline';
+                    log('error', `Peer ${peer.name} is offline`);
+                }
+            } catch (error) {
+                peer.status = 'offline';
+                log('error', `Failed to connect to peer ${peer.name}: ${error.message}`);
+            }
+            
+            savePeers();
+            renderPeers();
+        }
+
+        // Remove a peer
+        function removePeer(peerId) {
+            const peer = peers.find(p => p.id === peerId);
+            if (peer) {
+                log('info', `Removing peer: ${peer.name}`);
+                peers = peers.filter(p => p.id !== peerId);
+                savePeers();
+                renderPeers();
+            }
+        }
+
+        // Render peers list
+        function renderPeers() {
+            peerList.innerHTML = '';
+            
+            if (peers.length === 0) {
+                peerList.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">No peers added yet</p>';
+                return;
+            }
+            
+            peers.forEach(peer => {
+                const peerElement = document.createElement('div');
+                peerElement.className = 'peer-item';
+                
+                const statusClass = peer.status === 'online' ? 'online' : 'offline';
+                const statusText = peer.status === 'online' ? 'Online' : 'Offline';
+                
+                peerElement.innerHTML = `
+                    <div class="peer-info">
+                        <div class="peer-name">${peer.name}</div>
+                        <div class="peer-status">${peer.url} - ${statusText}</div>
+                    </div>
+                    <div class="peer-actions">
+                        <button class="btn btn-secondary" onclick="syncWithPeer('${peer.id}')" ${peer.status === 'offline' ? 'disabled' : ''}>
+                            Sync
+                        </button>
+                        <button class="btn btn-danger" onclick="removePeer('${peer.id}')">
+                            Remove
+                        </button>
+                    </div>
+                `;
+                
+                peerList.appendChild(peerElement);
+            });
+            
+            updateStats();
+        }
+
+        // Sync with a specific peer
+        async function syncWithPeer(peerId) {
+            const peer = peers.find(p => p.id === peerId);
+            if (!peer) return;
+            
+            log('info', `Syncing with peer: ${peer.name}`);
+            
+            try {
+                const response = await fetch(`${peer.url}/api/data/latest?limit=100`);
+                if (response.ok) {
+                    const data = await response.json();
+                    log('success', `Received ${data.length} records from ${peer.name}`);
+                    
+                    // Here you would process and merge the data
+                    // For now, just log the sync
+                    peer.lastSync = new Date().toISOString();
+                    savePeers();
+                    renderPeers();
+                } else {
+                    log('error', `Failed to sync with ${peer.name}`);
+                }
+            } catch (error) {
+                log('error', `Sync error with ${peer.name}: ${error.message}`);
+            }
+        }
+
+        // Refresh data from server
+        async function refreshData() {
+            try {
+                const response = await fetch('/api/data/latest?limit=100');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateDataStats(data);
+                    lastDataUpdate = new Date();
+                    lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
+                    log('success', `Refreshed data: ${data.length} records`);
+                } else {
+                    log('error', 'Failed to refresh data');
+                }
+            } catch (error) {
+                log('error', `Refresh error: ${error.message}`);
+            }
+        }
+
+        // Export data
+        async function exportData() {
+            try {
+                const response = await fetch('/api/data/export');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `galileosky_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    log('success', 'Data exported successfully');
+                } else {
+                    log('error', 'Failed to export data');
+                }
+            } catch (error) {
+                log('error', `Export error: ${error.message}`);
+            }
+        }
+
+        // Clear data
+        async function clearData() {
+            if (!confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/data/clear', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    updateDataStats([]);
+                    log('success', 'All data cleared successfully');
+                } else {
+                    log('error', 'Failed to clear data');
+                }
+            } catch (error) {
+                log('error', `Clear error: ${error.message}`);
+            }
+        }
+
+        // Handle new data from Socket.IO
+        function handleNewData(data) {
+            log('info', `New data received: ${data.deviceId || 'Unknown device'}`);
+            lastDataUpdate = new Date();
+            lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
+            
+            // Update stats (you would need to get the full data here)
+            refreshData();
+        }
+
+        // Update data statistics
+        function updateDataStats(data) {
+            totalRecords.textContent = data.length || 0;
+            totalDevices.textContent = new Set(data.map(d => d.deviceId)).size || 0;
+            updateStats();
+        }
+
+        // Update general statistics
+        function updateStats() {
+            const onlinePeers = peers.filter(p => p.status === 'online').length;
+            activePeers.textContent = onlinePeers;
+            
+            const syncPercentage = peers.length > 0 ? Math.round((onlinePeers / peers.length) * 100) : 0;
+            syncStatus.textContent = `${syncPercentage}%`;
+        }
+
+        // Save peers to localStorage
+        function savePeers() {
+            localStorage.setItem('galileosky_peers', JSON.stringify(peers));
+        }
+
+        // Load peers from localStorage
+        function loadPeers() {
+            const saved = localStorage.getItem('galileosky_peers');
+            if (saved) {
+                peers = JSON.parse(saved);
+                renderPeers();
+            }
+        }
+
+        // Add log entry
+        function log(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            activityLog.appendChild(logEntry);
+            activityLog.scrollTop = activityLog.scrollHeight;
+            
+            // Keep only last 50 log entries
+            while (activityLog.children.length > 50) {
+                activityLog.removeChild(activityLog.firstChild);
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html> 

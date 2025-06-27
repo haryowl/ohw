@@ -65,6 +65,55 @@ let lastIMEI = null;
 let parsedData = [];
 let devices = new Map();
 
+// Connection to IMEI mapping for multi-device support
+const connectionToIMEI = new Map();
+
+// Helper function to get IMEI from connection
+function getIMEIFromConnection(clientAddress) {
+    return connectionToIMEI.get(clientAddress) || null;
+}
+
+// Helper function to update device tracking
+function updateDeviceTracking(imei, clientAddress, data) {
+    // Map connection to IMEI
+    if (clientAddress) {
+        connectionToIMEI.set(clientAddress, imei);
+    }
+    
+    // Update device stats
+    if (!devices.has(imei)) {
+        devices.set(imei, {
+            firstSeen: new Date().toISOString(),
+            lastSeen: new Date().toISOString(),
+            recordCount: 0,
+            totalRecords: 0,
+            clientAddress: clientAddress,
+            lastLocation: null
+        });
+    }
+    
+    const device = devices.get(imei);
+    device.lastSeen = new Date().toISOString();
+    device.recordCount += 1;
+    device.totalRecords += 1;
+    
+    // Update last location if coordinates are available
+    if (data.latitude && data.longitude) {
+        device.lastLocation = {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timestamp: data.timestamp
+        };
+    }
+    
+    // Update client address if not set
+    if (clientAddress && !device.clientAddress) {
+        device.clientAddress = clientAddress;
+    }
+    
+    console.log(`📱 Device ${imei} updated: ${device.totalRecords} total records`);
+}
+
 // Data persistence functions
 function saveData() {
     try {
@@ -880,7 +929,7 @@ async function parsePacket(buffer) {
 }
 
 // Add parsed data to storage
-function addParsedData(data) {
+function addParsedData(data, clientAddress = null) {
     if (!data || typeof data !== 'object') return;
     
     // If this is a main packet with records, extract data from all records
@@ -895,11 +944,24 @@ function addParsedData(data) {
             const record = data.records[recordIndex];
             const tags = record.tags;
             
+            // Extract IMEI first to determine device
+            let deviceIMEI = null;
+            if (tags['0x03']) {
+                deviceIMEI = tags['0x03'].value;
+            }
+            
+            // If no IMEI in this record, try to get from connection mapping
+            if (!deviceIMEI && clientAddress) {
+                // Try to get IMEI from connection mapping
+                deviceIMEI = getIMEIFromConnection(clientAddress);
+            }
+            
             // Extract common fields from tags
             const extractedData = {
                 timestamp: new Date().toISOString(),
-                deviceId: lastIMEI || 'unknown', // Use persisted IMEI
-                imei: lastIMEI || null,
+                deviceId: deviceIMEI || 'unknown',
+                imei: deviceIMEI || null,
+                clientAddress: clientAddress,
                 latitude: null,
                 longitude: null,
                 satellites: null,
@@ -921,13 +983,6 @@ function addParsedData(data) {
                 recordIndex: recordIndex + 1,
                 totalRecords: data.records.length
             };
-            
-            // Extract IMEI (tag 0x03) and persist it
-            if (tags['0x03']) {
-                extractedData.imei = tags['0x03'].value;
-                extractedData.deviceId = tags['0x03'].value;
-                lastIMEI = tags['0x03'].value; // Persist IMEI for future packets
-            }
             
             // Extract coordinates (tag 0x30)
             if (tags['0x30']) {
@@ -1019,6 +1074,11 @@ function addParsedData(data) {
             if (parsedData.length > MAX_RECORDS) {
                 parsedData = parsedData.slice(0, MAX_RECORDS);
             }
+            
+            // Update device tracking
+            if (deviceIMEI) {
+                updateDeviceTracking(deviceIMEI, clientAddress, extractedData);
+            }
         }
         
         // Calculate performance metrics
@@ -1032,22 +1092,7 @@ function addParsedData(data) {
         console.log(`📊 Speed: ${(processingTime / recordCount).toFixed(2)}ms per record`);
         console.log(`🔍 Tags found: ${data.records.map(r => Object.keys(r.tags).length).join(', ')}`);
         console.log(`💾 Storage: ${parsedData.length}/${MAX_RECORDS} records in memory`);
-        
-        // Update device stats
-        if (lastIMEI) {
-            if (!devices.has(lastIMEI)) {
-                devices.set(lastIMEI, {
-                    firstSeen: new Date().toISOString(),
-                    lastSeen: new Date().toISOString(),
-                    recordCount: 0,
-                    totalRecords: 0
-                });
-            }
-            const device = devices.get(lastIMEI);
-            device.lastSeen = new Date().toISOString();
-            device.recordCount += recordCount;
-            device.totalRecords += recordCount;
-        }
+        console.log(`📱 Active devices: ${devices.size}`);
     }
 }
 
@@ -1061,12 +1106,15 @@ function getDeviceStats() {
     const stats = {
         totalRecords: parsedData.length,
         activeDevices: devices.size,
+        activeConnections: activeConnections.size,
         lastUpdate: parsedData.length > 0 ? parsedData[0].timestamp : null,
         devices: Array.from(devices.entries()).map(([id, info]) => ({
             deviceId: id,
             lastSeen: info.lastSeen,
             totalRecords: info.totalRecords,
-            lastLocation: info.lastLocation
+            clientAddress: info.clientAddress,
+            lastLocation: info.lastLocation,
+            isConnected: info.clientAddress ? activeConnections.has(info.clientAddress) : false
         }))
     };
     
@@ -1153,7 +1201,7 @@ function handleConnection(socket) {
                     });
 
                     // Add to storage for frontend
-                    addParsedData(parsedPacket);
+                    addParsedData(parsedPacket, clientAddress);
 
                 } catch (error) {
                     logger.error('Error processing packet:', {
@@ -1212,6 +1260,13 @@ function cleanupConnection(clientAddress) {
             logger.error('Error destroying socket:', { address: clientAddress, error: error.message });
         }
         activeConnections.delete(clientAddress);
+    }
+    
+    // Clean up IMEI mapping
+    const imei = connectionToIMEI.get(clientAddress);
+    if (imei) {
+        console.log(`🔌 Device ${imei} disconnected from ${clientAddress}`);
+        connectionToIMEI.delete(clientAddress);
     }
 }
 

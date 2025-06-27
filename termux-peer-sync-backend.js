@@ -65,6 +65,55 @@ let lastIMEI = null;
 let parsedData = [];
 let devices = new Map();
 
+// Connection to IMEI mapping for multi-device support
+const connectionToIMEI = new Map();
+
+// Helper function to get IMEI from connection
+function getIMEIFromConnection(connectionId) {
+    return connectionToIMEI.get(connectionId) || null;
+}
+
+// Helper function to update device tracking
+function updateDeviceTracking(imei, connectionId, data) {
+    // Map connection to IMEI
+    if (connectionId) {
+        connectionToIMEI.set(connectionId, imei);
+    }
+    
+    // Update device stats
+    if (!devices.has(imei)) {
+        devices.set(imei, {
+            firstSeen: new Date().toISOString(),
+            lastSeen: new Date().toISOString(),
+            recordCount: 0,
+            totalRecords: 0,
+            connectionId: connectionId,
+            lastLocation: null
+        });
+    }
+    
+    const device = devices.get(imei);
+    device.lastSeen = new Date().toISOString();
+    device.recordCount += 1;
+    device.totalRecords += 1;
+    
+    // Update last location if coordinates are available
+    if (data.latitude && data.longitude) {
+        device.lastLocation = {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timestamp: data.timestamp
+        };
+    }
+    
+    // Update connection ID if not set
+    if (connectionId && !device.connectionId) {
+        device.connectionId = connectionId;
+    }
+    
+    console.log(`📱 Device ${imei} updated: ${device.totalRecords} total records`);
+}
+
 // Data persistence functions
 function saveData() {
     try {
@@ -337,12 +386,7 @@ function startTcpServer() {
                 
                 // Update devices map
                 if (parsedData.IMEI) {
-                    devices.set(parsedData.IMEI, {
-                        lastSeen: new Date().toISOString(),
-                        address: connectionId,
-                        data: parsedData
-                    });
-                    lastIMEI = parsedData.IMEI;
+                    updateDeviceTracking(parsedData.IMEI, connectionId, parsedData);
                 }
                 
                 // Emit to WebSocket clients
@@ -358,6 +402,13 @@ function startTcpServer() {
         socket.on('close', () => {
             logger.info(`TCP client disconnected`, { address: connectionId });
             activeConnections.delete(connectionId);
+            
+            // Clean up IMEI mapping
+            const imei = connectionToIMEI.get(connectionId);
+            if (imei) {
+                console.log(`🔌 Device ${imei} disconnected from ${connectionId}`);
+                connectionToIMEI.delete(connectionId);
+            }
         });
     });
     
@@ -387,10 +438,18 @@ function startHttpServer() {
     app.get('/api/data', (req, res) => {
         res.json({
             records: parsedData.slice(-100), // Last 100 records
-            devices: Object.fromEntries(devices),
+            devices: Array.from(devices.entries()).map(([id, info]) => ({
+                deviceId: id,
+                lastSeen: info.lastSeen,
+                totalRecords: info.totalRecords,
+                connectionId: info.connectionId,
+                lastLocation: info.lastLocation,
+                isConnected: info.connectionId ? activeConnections.has(info.connectionId) : false
+            })),
             lastIMEI: lastIMEI,
             totalRecords: parsedData.length,
-            totalDevices: devices.size
+            totalDevices: devices.size,
+            activeConnections: activeConnections.size
         });
     });
     
@@ -398,6 +457,8 @@ function startHttpServer() {
         res.json({
             status: 'running',
             tcpConnections: activeConnections.size,
+            totalDevices: devices.size,
+            activeDevices: Array.from(devices.values()).filter(d => d.connectionId && activeConnections.has(d.connectionId)).length,
             uptime: process.uptime(),
             memory: process.memoryUsage(),
             timestamp: new Date().toISOString()
@@ -408,6 +469,7 @@ function startHttpServer() {
         parsedData = [];
         devices.clear();
         lastIMEI = null;
+        connectionToIMEI.clear();
         saveData();
         res.json({ message: 'Data cleared successfully' });
     });
@@ -491,8 +553,14 @@ async function startServer() {
         console.log('');
         console.log('📊 Server Status:');
         console.log(`   Records: ${parsedData.length}`);
-        console.log(`   Devices: ${devices.size}`);
+        console.log(`   Total Devices: ${devices.size}`);
+        console.log(`   Active Connections: ${activeConnections.size}`);
         console.log(`   Last IMEI: ${lastIMEI || 'None'}`);
+        console.log('');
+        console.log('🔧 Multi-Device Support: Enabled');
+        console.log('   - Each device connection tracked separately');
+        console.log('   - IMEI mapping per connection');
+        console.log('   - Real-time device status monitoring');
         console.log('');
         console.log('⏹  Press Ctrl+C to stop the server');
         console.log('');
