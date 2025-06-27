@@ -83,8 +83,11 @@ function updateDeviceTracking(imei, clientAddress, data) {
         connectionToIMEI.set(clientAddress, imei);
     }
     
+    console.log(`📱 updateDeviceTracking called with IMEI: ${imei}, clientAddress: ${clientAddress}`);
+    
     // Update device stats
     if (!devices.has(imei)) {
+        console.log(`📱 Creating new device entry for IMEI: ${imei}`);
         devices.set(imei, {
             firstSeen: new Date().toISOString(),
             lastSeen: new Date().toISOString(),
@@ -115,6 +118,7 @@ function updateDeviceTracking(imei, clientAddress, data) {
     }
     
     console.log(`📱 Device ${imei} updated: ${device.totalRecords} total records`);
+    console.log(`📱 Current device keys:`, Array.from(devices.keys()));
 }
 
 // Data persistence functions
@@ -126,6 +130,7 @@ function saveData() {
         
         // Save devices data
         const devicesData = Object.fromEntries(devices);
+        console.log('💾 Saving devices with keys:', Object.keys(devicesData));
         fs.writeFileSync(DEVICES_FILE, JSON.stringify(devicesData, null, 2));
         
         // Save last IMEI
@@ -151,7 +156,9 @@ function loadData() {
         // Load devices data
         if (fs.existsSync(DEVICES_FILE)) {
             const devicesData = JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8'));
+            console.log('📂 Loading devices with keys:', Object.keys(devicesData));
             devices = new Map(Object.entries(devicesData));
+            console.log('📂 Devices Map keys after load:', Array.from(devices.keys()));
             logger.info(`Loaded ${devices.size} devices from storage`);
         }
         
@@ -956,13 +963,17 @@ function addParsedData(data, clientAddress = null) {
             let deviceIMEI = null;
             if (tags['0x03']) {
                 deviceIMEI = tags['0x03'].value;
+                console.log(`📱 Extracted IMEI from tag 0x03: ${deviceIMEI}`);
             }
             
             // If no IMEI in this record, try to get from connection mapping
             if (!deviceIMEI && clientAddress) {
                 // Try to get IMEI from connection mapping
                 deviceIMEI = getIMEIFromConnection(clientAddress);
+                console.log(`📱 Got IMEI from connection mapping: ${deviceIMEI}`);
             }
+            
+            console.log(`📱 Final device IMEI for record: ${deviceIMEI}`);
             
             // Extract common fields from tags
             const extractedData = {
@@ -1533,10 +1544,16 @@ function handleAPIRequest(req, res) {
             res.end(JSON.stringify(storageInfo, null, 2));
         } else if (pathname === '/api/data' && req.method === 'GET') {
             // Return data in the format expected by peer sync
+            // Convert devices Map to object with IMEI keys
+            const devicesObject = {};
+            devices.forEach((deviceInfo, imei) => {
+                devicesObject[imei] = deviceInfo;
+            });
+            
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 records: parsedData,
-                devices: Object.fromEntries(devices),
+                devices: devicesObject,
                 lastIMEI: lastIMEI,
                 totalRecords: parsedData.length,
                 totalDevices: devices.size,

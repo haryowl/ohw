@@ -592,6 +592,7 @@
                         totalRecords: data.totalRecords,
                         totalDevices: data.totalDevices,
                         devices: data.devices,
+                        deviceKeys: data.devices ? Object.keys(data.devices) : [],
                         lastIMEI: data.lastIMEI
                     });
                     
@@ -730,6 +731,15 @@
                 
                 try {
                     log('info', `Syncing with peer: ${peer.name} (${peer.url})`);
+                    
+                    // Debug: Log the data being sent
+                    console.log('📱 Sync data being sent:', {
+                        totalRecords: currentData.totalRecords,
+                        totalDevices: currentData.totalDevices,
+                        devices: currentData.devices,
+                        deviceKeys: currentData.devices ? Object.keys(currentData.devices) : [],
+                        lastIMEI: currentData.lastIMEI
+                    });
                     
                     // Perform peer sync using the peer sync endpoint with ACTUAL DATA
                     const response = await fetch(`${peer.url}/peer/sync`, {
