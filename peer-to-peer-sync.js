@@ -190,8 +190,10 @@ class PeerToPeerSync {
         // Merge devices with IMEI keys
         if (peerData.devices) {
             console.log(`📱 Merging devices from peer:`, Object.keys(peerData.devices));
-            Object.entries(peerData.devices).forEach(([imei, deviceInfo]) => {
-                console.log(`📱 Merging device with IMEI: ${imei}`);
+            Object.entries(peerData.devices).forEach(([key, deviceInfo]) => {
+                // Use deviceId (which contains IMEI) as the key instead of numeric key
+                const imei = deviceInfo.deviceId || key;
+                console.log(`📱 Merging device with IMEI: ${imei} (from key: ${key})`);
                 devices.set(imei, deviceInfo); // ✅ Use IMEI as key
             });
             console.log(`📱 Devices after merge:`, Array.from(devices.keys()));

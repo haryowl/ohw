@@ -741,6 +741,18 @@
                         lastIMEI: currentData.lastIMEI
                     });
                     
+                    // Create proper devices object with IMEI keys for sync
+                    const devicesForSync = {};
+                    if (currentData.devices) {
+                        Object.entries(currentData.devices).forEach(([key, deviceInfo]) => {
+                            // Use deviceId (IMEI) as the key instead of numeric key
+                            const imei = deviceInfo.deviceId || key;
+                            devicesForSync[imei] = deviceInfo;
+                        });
+                    }
+                    
+                    console.log('📱 Devices for sync with IMEI keys:', Object.keys(devicesForSync));
+                    
                     // Perform peer sync using the peer sync endpoint with ACTUAL DATA
                     const response = await fetch(`${peer.url}/peer/sync`, {
                         method: 'POST',
@@ -750,7 +762,7 @@
                         body: JSON.stringify({
                             deviceId: 'mobile-peer-sync-ui',
                             records: currentData.records || [], // ✅ SEND ACTUAL RECORDS
-                            devices: currentData.devices || {}, // ✅ SEND ACTUAL DEVICES
+                            devices: devicesForSync, // ✅ SEND DEVICES WITH IMEI KEYS
                             lastIMEI: currentData.lastIMEI || null, // ✅ SEND ACTUAL LAST IMEI
                             exportTime: new Date().toISOString()
                         }),
