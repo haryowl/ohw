@@ -152,19 +152,6 @@ const config = {
     keepAliveTime: 60000
 };
 
-// MIME types for HTTP server
-const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'text/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon'
-};
-
 // Simple logger
 const logger = {
     info: (message, data = {}) => {
