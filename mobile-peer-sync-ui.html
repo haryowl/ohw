@@ -596,7 +596,27 @@
                     });
                     
                     updateDataStats(data);
-                    updateDeviceList(data.devices || []);
+                    
+                    // Convert devices object to array for display
+                    let devicesArray = [];
+                    if (data.devices) {
+                        if (Array.isArray(data.devices)) {
+                            devicesArray = data.devices;
+                        } else {
+                            // Convert object to array
+                            devicesArray = Object.entries(data.devices).map(([imei, deviceInfo]) => ({
+                                deviceId: imei, // Use IMEI as deviceId for display
+                                imei: imei,
+                                lastSeen: deviceInfo.lastSeen,
+                                totalRecords: deviceInfo.totalRecords,
+                                connectionId: deviceInfo.clientAddress || deviceInfo.connectionId,
+                                lastLocation: deviceInfo.lastLocation,
+                                isConnected: deviceInfo.clientAddress ? true : false
+                            }));
+                        }
+                    }
+                    
+                    updateDeviceList(devicesArray);
                     lastDataUpdate = new Date();
                     lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
                     log('success', `Refreshed data: ${data.totalRecords || 0} records, ${data.totalDevices || 0} devices`);
@@ -831,13 +851,28 @@
         function updateDeviceList(devices) {
             console.log('📱 updateDeviceList called with:', devices);
             
-            if (!devices || devices.length === 0) {
+            // Handle both array and object formats
+            let devicesArray = devices;
+            if (devices && !Array.isArray(devices)) {
+                // Convert object to array if needed
+                devicesArray = Object.entries(devices).map(([imei, deviceInfo]) => ({
+                    deviceId: imei,
+                    imei: imei,
+                    lastSeen: deviceInfo.lastSeen,
+                    totalRecords: deviceInfo.totalRecords,
+                    connectionId: deviceInfo.clientAddress || deviceInfo.connectionId,
+                    lastLocation: deviceInfo.lastLocation,
+                    isConnected: deviceInfo.clientAddress ? true : false
+                }));
+            }
+            
+            if (!devicesArray || devicesArray.length === 0) {
                 deviceList.innerHTML = '<div class="device-info">No devices connected</div>';
                 return;
             }
 
             deviceList.innerHTML = '';
-            devices.forEach((device, index) => {
+            devicesArray.forEach((device, index) => {
                 console.log(`📱 Processing device ${index}:`, device);
                 
                 const deviceItem = document.createElement('div');

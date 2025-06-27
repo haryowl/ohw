@@ -1535,15 +1535,8 @@ function handleAPIRequest(req, res) {
             // Return data in the format expected by peer sync
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
-                records: parsedData.slice(-100), // Last 100 records
-                devices: Array.from(devices.entries()).map(([id, info]) => ({
-                    deviceId: id,
-                    lastSeen: info.lastSeen,
-                    totalRecords: info.totalRecords,
-                    connectionId: info.clientAddress || info.connectionId,
-                    lastLocation: info.lastLocation,
-                    isConnected: info.clientAddress ? true : false
-                })),
+                records: parsedData,
+                devices: Object.fromEntries(devices),
                 lastIMEI: lastIMEI,
                 totalRecords: parsedData.length,
                 totalDevices: devices.size,
@@ -1716,4 +1709,4 @@ peerSync.startPeerServer(parsedData, devices, lastIMEI);
 
 // Start servers
 startTCPServer();
-startHTTPServer(); 
+startHTTPServer();
