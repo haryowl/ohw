@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Device IP - Galileosky</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .ip-address {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2196f3;
+            text-align: center;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 10px;
+            border-left: 4px solid #4caf50;
+            background: #f9f9f9;
+        }
+        .warning {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Find Device IP Address</h1>
+        
+        <div class="info-box">
+            <h3>Device Information</h3>
+            <div id="deviceInfo">Loading...</div>
+        </div>
+
+        <div class="ip-address" id="ipAddress">
+            Finding IP address...
+        </div>
+
+        <div class="step">
+            <h3>Step 1: Enable Hotspot</h3>
+            <p>On this device (Device A):</p>
+            <ul>
+                <li>Go to Settings → Network & Internet → Hotspot & Tethering</li>
+                <li>Turn on "Mobile Hotspot"</li>
+                <li>Note the hotspot name and password</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Start Peer Server</h3>
+            <p>On this device (Device A):</p>
+            <ul>
+                <li>Go to: <a href="/mobile-peer-sync-ui.html" target="_blank">Mobile Peer Sync UI</a></li>
+                <li>Click "Start Server"</li>
+                <li>Note the connection URL shown</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Connect Device B</h3>
+            <p>On Device B:</p>
+            <ul>
+                <li>Connect to Device A's hotspot</li>
+                <li>Open browser and go to the connection URL from Step 2</li>
+                <li>Add peer URL and sync</li>
+            </ul>
+        </div>
+
+        <div class="warning">
+            <h3>⚠️ Important Notes</h3>
+            <ul>
+                <li>Both devices must be on the same hotspot network</li>
+                <li>Device A's IP is usually <strong>192.168.43.1</strong> when hotspot is active</li>
+                <li>If connection fails, try the IP address shown above</li>
+                <li>Make sure firewall allows connections on port 3000</li>
+            </ul>
+        </div>
+
+        <div class="info-box">
+            <h3>Connection URLs to Try</h3>
+            <div id="connectionUrls">
+                <p><strong>Primary:</strong> <span id="primaryUrl">Loading...</span></p>
+                <p><strong>Alternative:</strong> <span id="alternativeUrl">Loading...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function getDeviceInfo() {
+            try {
+                // Try to get IP from various sources
+                const responses = await Promise.allSettled([
+                    fetch('https://api.ipify.org?format=json'),
+                    fetch('https://api.myip.com'),
+                    fetch('https://ipapi.co/json/')
+                ]);
+
+                let ipAddress = 'Unknown';
+                let connectionUrl = '';
+
+                for (const response of responses) {
+                    if (response.status === 'fulfilled' && response.value.ok) {
+                        const data = await response.value.json();
+                        if (data.ip) {
+                            ipAddress = data.ip;
+                            break;
+                        }
+                    }
+                }
+
+                // For hotspot devices, the IP is usually 192.168.43.1
+                const hotspotIP = '192.168.43.1';
+                const localIP = window.location.hostname;
+
+                document.getElementById('deviceInfo').innerHTML = `
+                    <p><strong>Device:</strong> ${navigator.userAgent}</p>
+                    <p><strong>Public IP:</strong> ${ipAddress}</p>
+                    <p><strong>Local IP:</strong> ${localIP}</p>
+                    <p><strong>Hotspot IP:</strong> ${hotspotIP}</p>
+                `;
+
+                document.getElementById('ipAddress').textContent = `Hotspot IP: ${hotspotIP}`;
+
+                document.getElementById('primaryUrl').textContent = `http://${hotspotIP}:3000/mobile-peer-sync-ui.html`;
+                document.getElementById('alternativeUrl').textContent = `http://${localIP}:3000/mobile-peer-sync-ui.html`;
+
+            } catch (error) {
+                document.getElementById('deviceInfo').innerHTML = `
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>Try using:</strong> 192.168.43.1</p>
+                `;
+                document.getElementById('ipAddress').textContent = 'Use: 192.168.43.1';
+            }
+        }
+
+        // Get device info when page loads
+        getDeviceInfo();
+    </script>
+</body>
+</html> 

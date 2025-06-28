@@ -37,7 +37,7 @@ let syncData = {
 };
 
 // Configuration
-const MAX_RECORDS = 100000; // Maximum records to keep in memory
+const MAX_RECORDS = 200000; // Maximum records to keep in memory
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const MAX_BACKUPS = 10; // Keep last 10 backups
 
@@ -210,6 +210,9 @@ app.post('/api/sync/upload', (req, res) => {
             syncData.devices = { ...syncData.devices, ...devices };
         }
 
+        // Log current state before processing
+        console.log(`📊 Before processing: ${syncData.records.length} existing records, ${MAX_RECORDS} max allowed`);
+
         // Merge records (avoid duplicates by timestamp and deviceId)
         const existingRecordIds = new Set(syncData.records.map(r => `${r.timestamp}_${r.deviceId}`));
         const newRecords = data.filter(record => {
@@ -217,12 +220,20 @@ app.post('/api/sync/upload', (req, res) => {
             return !existingRecordIds.has(recordId);
         });
 
+        console.log(`📊 After deduplication: ${newRecords.length} new unique records`);
+
         syncData.records.push(...newRecords);
         
-        // Keep only last 50,000 records to prevent memory issues
-        if (syncData.records.length > 50000) {
-            syncData.records = syncData.records.slice(-50000);
+        console.log(`📊 After adding new records: ${syncData.records.length} total records`);
+        
+        // Keep only last MAX_RECORDS to prevent memory issues
+        if (syncData.records.length > MAX_RECORDS) {
+            const removedCount = syncData.records.length - MAX_RECORDS;
+            syncData.records = syncData.records.slice(-MAX_RECORDS);
+            console.log(`⚠️ Truncated ${removedCount} old records to stay within ${MAX_RECORDS} limit`);
         }
+
+        console.log(`📊 Final record count: ${syncData.records.length}/${MAX_RECORDS}`);
 
         // Update device state
         syncData.deviceStates[deviceId] = {

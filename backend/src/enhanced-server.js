@@ -1,33 +1,13 @@
-// backend/src/server.js
+// backend/src/enhanced-server.js
 
-const express = require('express');
 const http = require('http');
-const path = require('path');
-const cors = require('cors');
 const WebSocket = require('ws');
 const fs = require('fs');
 const { sequelize } = require('./models');
-const GalileoskyParser = require('./services/parser');
-const deviceManager = require('./services/deviceManager');
-const packetProcessor = require('./services/packetProcessor');
 const logger = require('./utils/logger');
-const config = require('./config');
 
 // Import the enhanced backend with peer sync functionality
 const { app, tcpServer } = require('./app');
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Serve static files if frontend build exists
-const frontendBuildPath = path.join(__dirname, '../../frontend/build');
-if (fs.existsSync(frontendBuildPath)) {
-    app.use(express.static(frontendBuildPath));
-}
-
-// Create parser instance
-const parser = new GalileoskyParser();
 
 // WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
@@ -87,24 +67,6 @@ function handleWebSocketMessage(ws, data) {
     }
 }
 
-// Serve React app if frontend build exists
-app.get('*', (req, res) => {
-    if (fs.existsSync(frontendBuildPath)) {
-        res.sendFile(path.join(frontendBuildPath, 'index.html'));
-    } else {
-        res.status(404).json({ error: 'Frontend build not found' });
-    }
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    logger.error('Application error:', err);
-    res.status(500).json({
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-});
-
 // Start the server
 async function startServer() {
     try {
@@ -121,7 +83,10 @@ async function startServer() {
             try {
                 server = await new Promise((resolve, reject) => {
                     const s = http.createServer(app).listen(port, '0.0.0.0', () => {
-                        console.log(`HTTP server listening on port ${port} (all interfaces)`);
+                        console.log(`🚀 Enhanced HTTP server listening on port ${port} (all interfaces)`);
+                        console.log(`📱 Mobile Peer Sync UI: http://localhost:${port}/mobile-peer-sync-ui.html`);
+                        console.log(`🔗 Peer Sync API: http://localhost:${port}/api/peer/status`);
+                        console.log(`🔄 Direct Peer Sync: http://localhost:${port}/peer/sync`);
                         resolve(s);
                     }).on('error', (error) => {
                         if (error.code === 'EADDRINUSE') {
@@ -154,27 +119,27 @@ async function startServer() {
             });
         });
 
-        console.log(`WebSocket server ready on port ${selectedPort}`);
+        console.log(`✅ Enhanced server ready with peer sync functionality on port ${selectedPort}`);
 
         // Handle graceful shutdown
         process.on('SIGINT', async () => {
-            console.log('Shutting down server...');
+            console.log('Shutting down enhanced server...');
             await sequelize.close();
             server.close(() => {
-                console.log('Server stopped');
+                console.log('Enhanced server stopped');
                 process.exit(0);
             });
         });
 
     } catch (error) {
-        console.error('Error starting server:', error);
+        console.error('Error starting enhanced server:', error);
         process.exit(1);
     }
 }
 
 // Start the server
 startServer().catch(error => {
-    console.error('Failed to start server:', error);
+    console.error('Failed to start enhanced server:', error);
     process.exit(1);
 });
 
@@ -184,4 +149,4 @@ module.exports = {
     tcpServer,
     wss,
     broadcast
-};
+}; 

@@ -87,7 +87,7 @@ cat > mobile-sync-config.json << EOF
     },
     "syncSettings": {
         "autoSyncInterval": 5,
-        "maxRecords": 50000,
+        "maxRecords": 200000,
         "enableRealTimeSync": true
     }
 }

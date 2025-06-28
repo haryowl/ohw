@@ -18,6 +18,18 @@ const { networkInterfaces } = require('os');
 // Import peer sync service
 const PeerToPeerSync = require('./backend/src/services/peerToPeerSync');
 
+// Import mobile sync client
+let MobileSyncClient = null;
+let syncClient = null;
+
+// Try to load mobile sync client
+try {
+    MobileSyncClient = require('./mobile-sync-client');
+    console.log('✅ Mobile sync client loaded successfully');
+} catch (error) {
+    console.log('⚠️ Mobile sync client not found, sync functionality disabled');
+}
+
 // Clear startup identification
 console.log('🚀 ========================================');
 console.log('🚀 GALILEOSKY ENHANCED BACKEND (FIXED)');
@@ -44,6 +56,20 @@ function getIpAddress() {
 
 // Get IP address
 const ipAddress = getIpAddress();
+
+// Initialize mobile sync client if available
+if (MobileSyncClient) {
+    try {
+        // Use localhost for sync service (assuming it runs on same device)
+        const syncServerUrl = 'http://localhost:3002';
+        const deviceId = `mobile-${ipAddress.replace(/\./g, '-')}`;
+        syncClient = new MobileSyncClient(syncServerUrl, deviceId);
+        console.log(`✅ Mobile sync client initialized: ${deviceId}`);
+        console.log(`📡 Sync server: ${syncServerUrl}`);
+    } catch (error) {
+        console.error('❌ Failed to initialize mobile sync client:', error.message);
+    }
+}
 
 // Ensure logs and data directories exist
 const logsDir = path.join(__dirname, 'logs');
@@ -885,7 +911,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
                     
-                    // Check for end of record
+                    // Check for end of record (0x00 terminator)
                     if (tag === 0x00) {
                         console.log(`Record ${recordIndex + 1} ended at position ${recordOffset}`);
                         break;
@@ -1014,6 +1040,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
+                    console.log(`Record ${recordIndex + 1} parsed with ${Object.keys(record.tags).length} tags: ${Object.keys(record.tags).join(', ')}`);
                 }
                 
                 dataOffset = recordOffset;
@@ -1094,7 +1121,7 @@ async function parsePacket(buffer) {
 }
 
 // Add parsed data to storage
-function addParsedData(data, clientAddress = null) {
+async function addParsedData(data, clientAddress = null) {
     if (!data || typeof data !== 'object') return;
     
     // If this is a main packet with records, extract data from all records
@@ -1269,6 +1296,36 @@ function addParsedData(data, clientAddress = null) {
             io.emit('deviceUpdate', parsedData[0]);
             console.log('📡 Emitted device data to Socket.IO clients');
         }
+        
+        // Sync data to mobile sync service if available
+        if (syncClient && data.records && data.records.length > 0) {
+            try {
+                console.log(`📱 Syncing ${data.records.length} records to mobile sync service...`);
+                
+                // Convert parsed data to sync format
+                const syncData = parsedData.slice(0, data.records.length).map(record => ({
+                    timestamp: record.timestamp,
+                    deviceId: record.deviceId,
+                    latitude: record.latitude,
+                    longitude: record.longitude,
+                    speed: record.speed,
+                    direction: record.direction,
+                    altitude: record.altitude,
+                    temperature: record.temperature,
+                    voltage: record.voltage,
+                    inputs: record.inputs,
+                    outputs: record.outputs,
+                    status: record.status,
+                    rawData: record.rawData
+                }));
+                
+                // Upload to sync service
+                const syncResult = await syncClient.uploadData(syncData, devices, lastIMEI);
+                console.log(`✅ Sync successful: ${syncResult.newRecords} new records synced`);
+            } catch (error) {
+                console.error('❌ Sync failed:', error.message);
+            }
+        }
     }
 }
 
@@ -1377,7 +1434,7 @@ function handleConnection(socket) {
                     });
 
                     // Add to storage for frontend
-                    addParsedData(parsedPacket, clientAddress);
+                    await addParsedData(parsedPacket, clientAddress);
 
                 } catch (error) {
                     logger.error('Error processing packet:', {
