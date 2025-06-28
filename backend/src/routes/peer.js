@@ -180,56 +180,6 @@ router.post('/import', (req, res) => {
     }
 });
 
-// Full bidirectional sync endpoint
-router.post('/sync', (req, res) => {
-    try {
-        const peerData = req.body;
-        
-        if (!peerData || !peerData.records) {
-            return res.status(400).json({ error: 'Invalid sync data' });
-        }
-
-        const parsedData = global.parsedData || [];
-        const devices = global.devices || new Map();
-        const lastIMEI = global.lastIMEI || null;
-
-        // Initialize peer sync if not already done
-        const peerSyncInstance = initializePeerSync(parsedData, devices, lastIMEI);
-
-        // Export our data to peer
-        const exportData = {
-            deviceId: peerSyncInstance.deviceId,
-            records: parsedData,
-            devices: Object.fromEntries(devices),
-            lastIMEI: lastIMEI,
-            exportTime: new Date().toISOString()
-        };
-
-        // Merge peer data into our data
-        const mergeResult = peerSyncInstance.mergePeerData(parsedData, devices, peerData);
-
-        // Return our data to peer and sync result
-        res.json({
-            success: true,
-            peerData: exportData,
-            syncResult: {
-                newRecords: mergeResult.newRecords,
-                totalRecords: parsedData.length
-            },
-            message: `Sync complete: ${mergeResult.newRecords} new records added`
-        });
-
-        logger.info('Peer sync completed', {
-            newRecords: mergeResult.newRecords,
-            totalRecords: parsedData.length,
-            peerDeviceId: peerData.deviceId
-        });
-    } catch (error) {
-        logger.error('Error during peer sync:', error);
-        res.status(500).json({ error: 'Sync failed' });
-    }
-});
-
 // Get peer discovery info
 router.get('/discovery', (req, res) => {
     try {
@@ -251,27 +201,6 @@ router.get('/discovery', (req, res) => {
     } catch (error) {
         logger.error('Error getting discovery info:', error);
         res.status(500).json({ error: 'Failed to get discovery info' });
-    }
-});
-
-// Serve mobile peer sync UI
-router.get('/mobile-peer-sync-ui.html', (req, res) => {
-    try {
-        const fs = require('fs');
-        const path = require('path');
-        const uiPath = path.join(__dirname, '../../../mobile-peer-sync-ui.html');
-        
-        if (fs.existsSync(uiPath)) {
-            const content = fs.readFileSync(uiPath, 'utf8');
-            res.setHeader('Content-Type', 'text/html');
-            res.send(content);
-            logger.info('Served mobile peer sync UI');
-        } else {
-            res.status(404).send('<h1>Mobile Peer Sync UI not found</h1><p>File: mobile-peer-sync-ui.html</p>');
-        }
-    } catch (error) {
-        logger.error('Error serving mobile peer sync UI:', error);
-        res.status(500).send('<h1>Error serving mobile peer sync UI</h1>');
     }
 });
 

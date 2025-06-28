@@ -18,18 +18,6 @@ const { networkInterfaces } = require('os');
 // Import peer sync service
 const PeerToPeerSync = require('./backend/src/services/peerToPeerSync');
 
-// Import mobile sync client
-let MobileSyncClient = null;
-let syncClient = null;
-
-// Try to load mobile sync client
-try {
-    MobileSyncClient = require('./mobile-sync-client');
-    console.log('✅ Mobile sync client loaded successfully');
-} catch (error) {
-    console.log('⚠️ Mobile sync client not found, sync functionality disabled');
-}
-
 // Clear startup identification
 console.log('🚀 ========================================');
 console.log('🚀 GALILEOSKY ENHANCED BACKEND (FIXED)');
@@ -56,20 +44,6 @@ function getIpAddress() {
 
 // Get IP address
 const ipAddress = getIpAddress();
-
-// Initialize mobile sync client if available
-if (MobileSyncClient) {
-    try {
-        // Use localhost for sync service (assuming it runs on same device)
-        const syncServerUrl = 'http://localhost:3002';
-        const deviceId = `mobile-${ipAddress.replace(/\./g, '-')}`;
-        syncClient = new MobileSyncClient(syncServerUrl, deviceId);
-        console.log(`✅ Mobile sync client initialized: ${deviceId}`);
-        console.log(`📡 Sync server: ${syncServerUrl}`);
-    } catch (error) {
-        console.error('❌ Failed to initialize mobile sync client:', error.message);
-    }
-}
 
 // Ensure logs and data directories exist
 const logsDir = path.join(__dirname, 'logs');
@@ -150,9 +124,6 @@ function updateDeviceTracking(imei, clientAddress, data) {
 // Data persistence functions
 function saveData() {
     try {
-        // Create backup before saving
-        createDataBackup();
-        
         // Save parsed data (keep only last MAX_RECORDS to prevent file from getting too large)
         const dataToSave = parsedData.slice(-MAX_RECORDS);
         fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(dataToSave, null, 2));
@@ -167,190 +138,43 @@ function saveData() {
             fs.writeFileSync(LAST_IMEI_FILE, JSON.stringify({ lastIMEI }, null, 2));
         }
         
-        logger.info(`✅ Data saved: ${dataToSave.length} records, ${devices.size} devices`);
-        
-        // Clean up old backups
-        cleanupOldBackups();
-        
+        logger.info(`Data saved: ${dataToSave.length} records, ${devices.size} devices`);
     } catch (error) {
-        logger.error('❌ Error saving data:', { error: error.message });
+        logger.error('Error saving data:', { error: error.message });
     }
 }
 
 function loadData() {
     try {
-        // Try to load from main files first
-        let loadedFromBackup = false;
-        
         // Load parsed data
         if (fs.existsSync(PARSED_DATA_FILE)) {
-            try {
-                const data = JSON.parse(fs.readFileSync(PARSED_DATA_FILE, 'utf8'));
-                parsedData = data;
-                logger.info(`✅ Loaded ${parsedData.length} records from main storage`);
-            } catch (error) {
-                logger.error('❌ Error loading main parsed data:', error.message);
-                loadedFromBackup = true;
-            }
+            const data = JSON.parse(fs.readFileSync(PARSED_DATA_FILE, 'utf8'));
+            parsedData = data;
+            logger.info(`Loaded ${parsedData.length} records from storage`);
         }
         
         // Load devices data
         if (fs.existsSync(DEVICES_FILE)) {
-            try {
-                const devicesData = JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8'));
-                console.log('📂 Loading devices with keys:', Object.keys(devicesData));
-                devices = new Map(Object.entries(devicesData));
-                console.log('📂 Devices Map keys after load:', Array.from(devices.keys()));
-                logger.info(`✅ Loaded ${devices.size} devices from main storage`);
-            } catch (error) {
-                logger.error('❌ Error loading main devices data:', error.message);
-                loadedFromBackup = true;
-            }
+            const devicesData = JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8'));
+            console.log('📂 Loading devices with keys:', Object.keys(devicesData));
+            devices = new Map(Object.entries(devicesData));
+            console.log('📂 Devices Map keys after load:', Array.from(devices.keys()));
+            logger.info(`Loaded ${devices.size} devices from storage`);
         }
         
         // Load last IMEI
         if (fs.existsSync(LAST_IMEI_FILE)) {
-            try {
-                const imeiData = JSON.parse(fs.readFileSync(LAST_IMEI_FILE, 'utf8'));
-                lastIMEI = imeiData.lastIMEI;
-                logger.info(`✅ Loaded last IMEI: ${lastIMEI}`);
-            } catch (error) {
-                logger.error('❌ Error loading last IMEI:', error.message);
-            }
-        }
-        
-        // If main files failed, try to recover from backup
-        if (loadedFromBackup) {
-            logger.info('🔄 Attempting to recover data from backup...');
-            if (recoverDataFromBackup()) {
-                logger.info('✅ Data recovered from backup successfully');
-            } else {
-                logger.warn('⚠️ No backup found, starting with empty data');
-                initializeEmptyData();
-            }
-        }
-        
-    } catch (error) {
-        logger.error('❌ Error loading data:', { error: error.message });
-        // If loading fails, try to recover from backup
-        if (recoverDataFromBackup()) {
-            logger.info('✅ Data recovered from backup after error');
-        } else {
-            logger.warn('⚠️ Starting with empty data after recovery failure');
-            initializeEmptyData();
-        }
-    }
-}
-
-// Create backup of current data
-function createDataBackup() {
-    try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupDir = path.join(__dirname, 'backups');
-        if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir, { recursive: true });
-        }
-        
-        const backupData = {
-            parsedData: parsedData.slice(-MAX_RECORDS),
-            devices: Object.fromEntries(devices),
-            lastIMEI: lastIMEI,
-            timestamp: timestamp
-        };
-        
-        const backupFile = path.join(backupDir, `data_backup_${timestamp}.json`);
-        fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
-        logger.info(`💾 Backup created: ${backupFile}`);
-        
-    } catch (error) {
-        logger.error('❌ Error creating backup:', error.message);
-    }
-}
-
-// Get list of backup files
-function getBackupFiles() {
-    try {
-        const backupDir = path.join(__dirname, 'backups');
-        if (!fs.existsSync(backupDir)) {
-            return [];
-        }
-        
-        const files = fs.readdirSync(backupDir);
-        return files
-            .filter(file => file.startsWith('data_backup_') && file.endsWith('.json'))
-            .map(file => path.join(backupDir, file))
-            .sort();
-    } catch (error) {
-        logger.error('❌ Error reading backup directory:', error.message);
-        return [];
-    }
-}
-
-// Clean up old backups (keep last 5)
-function cleanupOldBackups() {
-    try {
-        const backupFiles = getBackupFiles();
-        const MAX_BACKUPS = 5;
-        
-        if (backupFiles.length > MAX_BACKUPS) {
-            const filesToDelete = backupFiles.slice(0, backupFiles.length - MAX_BACKUPS);
-            filesToDelete.forEach(file => {
-                fs.unlinkSync(file);
-                logger.info(`🗑️ Deleted old backup: ${file}`);
-            });
+            const imeiData = JSON.parse(fs.readFileSync(LAST_IMEI_FILE, 'utf8'));
+            lastIMEI = imeiData.lastIMEI;
+            logger.info(`Loaded last IMEI: ${lastIMEI}`);
         }
     } catch (error) {
-        logger.error('❌ Error cleaning up backups:', error.message);
+        logger.error('Error loading data:', { error: error.message });
+        // If loading fails, start with empty data
+        parsedData = [];
+        devices = new Map();
+        lastIMEI = null;
     }
-}
-
-// Recover data from backup
-function recoverDataFromBackup() {
-    try {
-        const backupFiles = getBackupFiles();
-        if (backupFiles.length === 0) {
-            return false;
-        }
-        
-        // Try to recover from the most recent backup
-        for (let i = backupFiles.length - 1; i >= 0; i--) {
-            try {
-                const backupFile = backupFiles[i];
-                const backupData = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
-                
-                if (backupData.parsedData && Array.isArray(backupData.parsedData)) {
-                    parsedData = backupData.parsedData;
-                    devices = new Map(Object.entries(backupData.devices || {}));
-                    lastIMEI = backupData.lastIMEI;
-                    
-                    logger.info(`✅ Data recovered from backup: ${parsedData.length} records, ${devices.size} devices`);
-                    
-                    // Restore main files from backup
-                    fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(parsedData, null, 2));
-                    fs.writeFileSync(DEVICES_FILE, JSON.stringify(Object.fromEntries(devices), null, 2));
-                    if (lastIMEI) {
-                        fs.writeFileSync(LAST_IMEI_FILE, JSON.stringify({ lastIMEI }, null, 2));
-                    }
-                    
-                    return true;
-                }
-            } catch (error) {
-                logger.error(`❌ Failed to recover from backup ${i}:`, error.message);
-            }
-        }
-        
-        return false;
-    } catch (error) {
-        logger.error('❌ Error during data recovery:', error.message);
-        return false;
-    }
-}
-
-// Initialize empty data
-function initializeEmptyData() {
-    parsedData = [];
-    devices = new Map();
-    lastIMEI = null;
 }
 
 // Auto-save data every 30 seconds
@@ -911,7 +735,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                     const tag = buffer.readUInt8(recordOffset);
                     recordOffset++;
                     
-                    // Check for end of record (0x00 terminator)
+                    // Check for end of record
                     if (tag === 0x00) {
                         console.log(`Record ${recordIndex + 1} ended at position ${recordOffset}`);
                         break;
@@ -1040,7 +864,6 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
 
                 if (Object.keys(record.tags).length > 0) {
                     result.records.push(record);
-                    console.log(`Record ${recordIndex + 1} parsed with ${Object.keys(record.tags).length} tags: ${Object.keys(record.tags).join(', ')}`);
                 }
                 
                 dataOffset = recordOffset;
@@ -1121,7 +944,7 @@ async function parsePacket(buffer) {
 }
 
 // Add parsed data to storage
-async function addParsedData(data, clientAddress = null) {
+function addParsedData(data, clientAddress = null) {
     if (!data || typeof data !== 'object') return;
     
     // If this is a main packet with records, extract data from all records
@@ -1296,36 +1119,6 @@ async function addParsedData(data, clientAddress = null) {
             io.emit('deviceUpdate', parsedData[0]);
             console.log('📡 Emitted device data to Socket.IO clients');
         }
-        
-        // Sync data to mobile sync service if available
-        if (syncClient && data.records && data.records.length > 0) {
-            try {
-                console.log(`📱 Syncing ${data.records.length} records to mobile sync service...`);
-                
-                // Convert parsed data to sync format
-                const syncData = parsedData.slice(0, data.records.length).map(record => ({
-                    timestamp: record.timestamp,
-                    deviceId: record.deviceId,
-                    latitude: record.latitude,
-                    longitude: record.longitude,
-                    speed: record.speed,
-                    direction: record.direction,
-                    altitude: record.altitude,
-                    temperature: record.temperature,
-                    voltage: record.voltage,
-                    inputs: record.inputs,
-                    outputs: record.outputs,
-                    status: record.status,
-                    rawData: record.rawData
-                }));
-                
-                // Upload to sync service
-                const syncResult = await syncClient.uploadData(syncData, devices, lastIMEI);
-                console.log(`✅ Sync successful: ${syncResult.newRecords} new records synced`);
-            } catch (error) {
-                console.error('❌ Sync failed:', error.message);
-            }
-        }
     }
 }
 
@@ -1434,7 +1227,7 @@ function handleConnection(socket) {
                     });
 
                     // Add to storage for frontend
-                    await addParsedData(parsedPacket, clientAddress);
+                    addParsedData(parsedPacket, clientAddress);
 
                 } catch (error) {
                     logger.error('Error processing packet:', {
@@ -1939,4 +1732,4 @@ peerSync.startPeerServer(parsedData, devices, lastIMEI);
 
 // Start servers
 startTCPServer();
-startHTTPServer();
+startHTTPServer(); 

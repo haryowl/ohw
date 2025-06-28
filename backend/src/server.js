@@ -13,7 +13,6 @@ const packetProcessor = require('./services/packetProcessor');
 const logger = require('./utils/logger');
 const config = require('./config');
 
-// Import the enhanced backend with peer sync functionality
 const { app, tcpServer } = require('./app');
 
 // Middleware

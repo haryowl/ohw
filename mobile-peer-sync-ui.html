@@ -358,18 +358,27 @@
                 </div>
             </div>
 
-            <!-- Data Section -->
+            <!-- Data Management Section -->
             <div class="section">
                 <h3>📊 Data Management</h3>
-                <div class="device-info">
-                    <strong>Total Records:</strong> <span id="totalRecords">0</span><br>
-                    <strong>Total Devices:</strong> <span id="totalDevices">0</span><br>
-                    <strong>Last Sync:</strong> <span id="lastSync">Never</span>
+                <div class="input-group">
+                    <label>Current Records:</label>
+                    <div id="recordCount" class="device-info">0</div>
                 </div>
-                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
-                <button class="btn btn-warning" onclick="exportData()">📤 Export Data</button>
-                <button class="btn btn-warning" onclick="clearData()">🗑️ Clear Data</button>
-                <button class="btn btn-success" onclick="processMergedData()">🔄 Process Merged Data</button>
+                <div class="input-group">
+                    <label>Connected Devices:</label>
+                    <div id="deviceCount" class="device-info">0</div>
+                </div>
+                <div class="input-group">
+                    <label>Active Connections:</label>
+                    <div id="activeConnections" class="device-info">0</div>
+                </div>
+                <div class="input-group">
+                    <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
+                    <button class="btn btn-success" onclick="exportData()">📥 Export Data</button>
+                    <button class="btn btn-warning" onclick="syncData()" id="syncButton">🔄 Sync Data</button>
+                    <button class="btn btn-danger" onclick="clearData()">🗑️ Clear Data</button>
+                </div>
             </div>
 
             <!-- Device List Section -->
@@ -383,11 +392,9 @@
             <!-- Activity Log Section -->
             <div class="section">
                 <h3>📝 Activity Log</h3>
-                <div class="log" id="activityLog">
-                    <div class="log-entry info">System initialized</div>
+                <div id="activityLog" class="log">
+                    <div class="log-entry info">Mobile Peer Sync initialized...</div>
                 </div>
-                <button class="btn btn-warning" onclick="clearLog()">🗑️ Clear Log</button>
-                <button class="btn btn-info" onclick="showDebugInfo()">🐛 Debug Info</button>
             </div>
         </div>
     </div>
@@ -575,35 +582,6 @@
         // Refresh data from server
         async function refreshData() {
             try {
-                // ✅ NEW: Check for merged data in localStorage first
-                const mergedData = localStorage.getItem('galileosky_merged_data');
-                if (mergedData) {
-                    try {
-                        const parsedMergedData = JSON.parse(mergedData);
-                        console.log('📱 Found merged data in localStorage:', {
-                            records: parsedMergedData.records.length,
-                            devices: Object.keys(parsedMergedData.devices).length,
-                            mergedAt: parsedMergedData.mergedAt
-                        });
-                        
-                        // Update display with merged data
-                        updateDataStats(parsedMergedData);
-                        updateDeviceList(parsedMergedData.devices);
-                        lastDataUpdate = new Date();
-                        lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
-                        
-                        log('info', `📊 Displaying merged data: ${parsedMergedData.records.length} records, ${Object.keys(parsedMergedData.devices).length} devices`);
-                        
-                        // Clear the merged data from localStorage after displaying
-                        localStorage.removeItem('galileosky_merged_data');
-                        
-                        return;
-                    } catch (error) {
-                        console.error('📱 Error parsing merged data:', error);
-                        localStorage.removeItem('galileosky_merged_data');
-                    }
-                }
-
                 // Get data statistics
                 const dataResponse = await fetch('/api/data');
                 if (dataResponse.ok) {
@@ -812,30 +790,6 @@
                             log('info', `📥 Received: ${newRecords} new records from peer`);
                             peer.lastSync = new Date().toISOString();
                             
-                            // ✅ PROCESS BIDIRECTIONAL SYNC: Handle data sent back from server
-                            if (syncResult.peerData) {
-                                log('info', `🔄 Processing bidirectional sync data from ${peer.name}`);
-                                console.log('📱 Received peer data from server:', {
-                                    totalRecords: syncResult.peerData.records ? syncResult.peerData.records.length : 0,
-                                    totalDevices: syncResult.peerData.devices ? Object.keys(syncResult.peerData.devices).length : 0,
-                                    devices: syncResult.peerData.devices,
-                                    lastIMEI: syncResult.peerData.lastIMEI
-                                });
-                                
-                                // ✅ NEW: Merge peer data directly in frontend for bidirectional sync
-                                try {
-                                    const additionalRecords = await mergePeerDataDirectly(syncResult.peerData);
-                                    log('success', `🔄 Bidirectional sync complete: ${additionalRecords} additional records merged`);
-                                    totalNewRecords += additionalRecords;
-                                    
-                                    // Update the display immediately
-                                    await refreshData();
-                                    
-                                } catch (mergeError) {
-                                    log('error', `❌ Error merging server data: ${mergeError.message}`);
-                                }
-                            }
-                            
                             // Update sync results
                             syncResults.textContent = `✅ ${successfulSyncs} successful, ${failedSyncs} failed, ${totalNewRecords} new records`;
                         } else {
@@ -904,39 +858,6 @@
                 }
             } catch (error) {
                 log('error', `Clear error: ${error.message}`);
-            }
-        }
-
-        // ✅ NEW: Process merged data from localStorage
-        function processMergedData() {
-            const mergedData = localStorage.getItem('galileosky_merged_data');
-            if (!mergedData) {
-                log('warning', 'No merged data found in localStorage');
-                return;
-            }
-
-            try {
-                const parsedMergedData = JSON.parse(mergedData);
-                console.log('📱 Processing merged data:', {
-                    records: parsedMergedData.records.length,
-                    devices: Object.keys(parsedMergedData.devices).length,
-                    mergedAt: parsedMergedData.mergedAt
-                });
-                
-                // Update display with merged data
-                updateDataStats(parsedMergedData);
-                updateDeviceList(parsedMergedData.devices);
-                lastDataUpdate = new Date();
-                lastUpdate.textContent = lastDataUpdate.toLocaleTimeString();
-                
-                log('success', `📊 Processed merged data: ${parsedMergedData.records.length} records, ${Object.keys(parsedMergedData.devices).length} devices`);
-                
-                // Clear the merged data from localStorage after processing
-                localStorage.removeItem('galileosky_merged_data');
-                
-            } catch (error) {
-                log('error', `Failed to process merged data: ${error.message}`);
-                localStorage.removeItem('galileosky_merged_data');
             }
         }
 
@@ -1040,108 +961,6 @@
             // Keep only last 50 log entries
             while (activityLog.children.length > 50) {
                 activityLog.removeChild(activityLog.firstChild);
-            }
-        }
-
-        // ✅ NEW: Merge peer data directly in frontend for bidirectional sync
-        function mergePeerDataDirectly(peerData) {
-            if (!peerData || !peerData.records) {
-                return Promise.resolve(0);
-            }
-
-            console.log('📱 Frontend merging peer data:', {
-                peerDeviceId: peerData.deviceId,
-                peerRecords: peerData.records.length,
-                peerDevices: peerData.devices ? Object.keys(peerData.devices).length : 0
-            });
-
-            // Get current data from the backend
-            return fetch('/api/data')
-                .then(response => response.json())
-                .then(currentData => {
-                    // Create a map of existing records by unique key (timestamp + deviceId)
-                    const existingRecords = new Map();
-                    if (currentData.records) {
-                        currentData.records.forEach(record => {
-                            const key = `${record.timestamp}_${record.deviceId}`;
-                            existingRecords.set(key, record);
-                        });
-                    }
-
-                    // Add new records from peer
-                    let newRecordsCount = 0;
-                    peerData.records.forEach(record => {
-                        const key = `${record.timestamp}_${record.deviceId}`;
-                        if (!existingRecords.has(key)) {
-                            existingRecords.set(key, record);
-                            newRecordsCount++;
-                        }
-                    });
-
-                    // Convert back to array and sort by timestamp
-                    const mergedRecords = Array.from(existingRecords.values())
-                        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                    // ✅ SIMPLIFIED: Store merged data in localStorage for now
-                    // This allows the bidirectional sync to work without requiring new backend endpoints
-                    const mergedData = {
-                        records: mergedRecords,
-                        devices: { ...currentData.devices, ...peerData.devices },
-                        lastIMEI: peerData.lastIMEI || currentData.lastIMEI,
-                        mergedAt: new Date().toISOString()
-                    };
-                    
-                    localStorage.setItem('galileosky_merged_data', JSON.stringify(mergedData));
-                    
-                    console.log('📱 Frontend merge complete:', newRecordsCount, 'new records');
-                    console.log('📱 Merged data stored in localStorage for backend processing');
-                    
-                    return newRecordsCount;
-                })
-                .catch(error => {
-                    console.error('📱 Frontend merge error:', error);
-                    throw error;
-                });
-        }
-
-        // Clear log
-        function clearLog() {
-            document.getElementById('activityLog').innerHTML = '<div class="log-entry info">Log cleared</div>';
-        }
-
-        // ✅ NEW: Show debug information
-        function showDebugInfo() {
-            const mergedData = localStorage.getItem('galileosky_merged_data');
-            const debugInfo = {
-                timestamp: new Date().toISOString(),
-                deviceId: deviceId,
-                deviceIP: deviceIP,
-                isServerMode: isServerMode,
-                hasMergedData: !!mergedData,
-                mergedDataSize: mergedData ? mergedData.length : 0,
-                localStorageKeys: Object.keys(localStorage).filter(key => key.startsWith('galileosky')),
-                peers: peers.length,
-                onlinePeers: peers.filter(p => p.status === 'online').length
-            };
-
-            if (mergedData) {
-                try {
-                    const parsed = JSON.parse(mergedData);
-                    debugInfo.mergedRecords = parsed.records ? parsed.records.length : 0;
-                    debugInfo.mergedDevices = parsed.devices ? Object.keys(parsed.devices).length : 0;
-                    debugInfo.mergedAt = parsed.mergedAt;
-                } catch (error) {
-                    debugInfo.mergeError = error.message;
-                }
-            }
-
-            console.log('🐛 Debug Info:', debugInfo);
-            log('info', `🐛 Debug Info - Device: ${debugInfo.deviceId}, IP: ${debugInfo.deviceIP}, Server Mode: ${debugInfo.isServerMode}`);
-            log('info', `🐛 Merged Data: ${debugInfo.hasMergedData ? 'Yes' : 'No'}, Size: ${debugInfo.mergedDataSize} bytes`);
-            log('info', `🐛 Peers: ${debugInfo.peers} total, ${debugInfo.onlinePeers} online`);
-            
-            if (debugInfo.hasMergedData && debugInfo.mergedRecords !== undefined) {
-                log('info', `🐛 Merged Records: ${debugInfo.mergedRecords}, Merged Devices: ${debugInfo.mergedDevices}`);
             }
         }
 
