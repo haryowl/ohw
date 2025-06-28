@@ -126,7 +126,16 @@ function saveData() {
     try {
         // Save parsed data (keep only last MAX_RECORDS to prevent file from getting too large)
         const dataToSave = parsedData.slice(-MAX_RECORDS);
-        fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(dataToSave, null, 2));
+        
+        // Check if data is too large before stringifying
+        const dataString = JSON.stringify(dataToSave, null, 2);
+        if (dataString.length > 100 * 1024 * 1024) { // 100MB limit
+            logger.warn('Data too large, truncating to last 50,000 records');
+            const truncatedData = parsedData.slice(-50000);
+            fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(truncatedData, null, 2));
+        } else {
+            fs.writeFileSync(PARSED_DATA_FILE, dataString);
+        }
         
         // Save devices data
         const devicesData = Object.fromEntries(devices);
@@ -141,6 +150,18 @@ function saveData() {
         logger.info(`Data saved: ${dataToSave.length} records, ${devices.size} devices`);
     } catch (error) {
         logger.error('Error saving data:', { error: error.message });
+        
+        // If saving fails due to size, try to save with fewer records
+        if (error.message.includes('Invalid string length') || error.message.includes('too large')) {
+            try {
+                logger.warn('Attempting to save with reduced data size...');
+                const reducedData = parsedData.slice(-10000); // Keep only last 10,000 records
+                fs.writeFileSync(PARSED_DATA_FILE, JSON.stringify(reducedData, null, 2));
+                logger.info(`Data saved with reduced size: ${reducedData.length} records`);
+            } catch (retryError) {
+                logger.error('Failed to save even with reduced data:', { error: retryError.message });
+            }
+        }
     }
 }
 
@@ -974,180 +995,169 @@ async function parsePacket(buffer) {
 
 // Add parsed data to storage
 function addParsedData(data, clientAddress = null) {
-    if (!data || typeof data !== 'object') return;
-    
-    // If this is a main packet with records, extract data from all records
-    if (data.records && data.records.length > 0) {
-        const startTime = Date.now();
-        const recordCount = data.records.length;
+    try {
+        // Get IMEI from connection mapping or data
+        let imei = getIMEIFromConnection(clientAddress);
         
-        console.log(`🚀 ENHANCED PARSER: Processing ${recordCount} records with optimized parser`);
+        if (!imei && data.imei) {
+            imei = data.imei;
+        }
         
-        // Process each record individually
-        for (let recordIndex = 0; recordIndex < data.records.length; recordIndex++) {
-            const record = data.records[recordIndex];
-            const tags = record.tags;
+        if (!imei && data.deviceId) {
+            imei = data.deviceId;
+        }
+        
+        console.log(`📱 Got IMEI from connection mapping: ${imei}`);
+        
+        // If we have records to process
+        if (data.records && Array.isArray(data.records)) {
+            console.log(`🚀 ENHANCED PARSER: Processing ${data.records.length} records with optimized parser`);
             
-            // Extract IMEI first to determine device
-            let deviceIMEI = null;
-            if (tags['0x03']) {
-                deviceIMEI = tags['0x03'].value;
-                console.log(`📱 Extracted IMEI from tag 0x03: ${deviceIMEI}`);
+            const startTime = Date.now();
+            let processedRecords = 0;
+            
+            for (let recordIndex = 0; recordIndex < data.records.length; recordIndex++) {
+                const record = data.records[recordIndex];
+                
+                // Extract IMEI from record if available
+                let recordIMEI = imei;
+                if (record.tags && record.tags['0x03'] && record.tags['0x03'].value) {
+                    recordIMEI = record.tags['0x03'].value;
+                    console.log(`📱 Final device IMEI for record: ${recordIMEI}`);
+                }
+                
+                if (!recordIMEI) {
+                    console.warn('No IMEI found for record, skipping');
+                    continue;
+                }
+                
+                // Create enhanced record with all available data
+                const enhancedRecord = {
+                    timestamp: new Date().toISOString(),
+                    deviceId: recordIMEI,
+                    imei: recordIMEI,
+                    clientAddress: clientAddress,
+                    recordIndex: recordIndex + 1,
+                    
+                    // Extract coordinates
+                    latitude: record.tags && record.tags['0x30'] ? record.tags['0x30'].value.latitude : null,
+                    longitude: record.tags && record.tags['0x30'] ? record.tags['0x30'].value.longitude : null,
+                    satellites: record.tags && record.tags['0x30'] ? record.tags['0x30'].value.satellites : null,
+                    correctness: record.tags && record.tags['0x30'] ? record.tags['0x30'].value.correctness : null,
+                    
+                    // Extract speed and direction
+                    speed: record.tags && record.tags['0x33'] ? record.tags['0x33'].value.speed : null,
+                    direction: record.tags && record.tags['0x33'] ? record.tags['0x33'].value.direction : null,
+                    
+                    // Extract height
+                    height: record.tags && record.tags['0x34'] ? record.tags['0x34'].value : null,
+                    
+                    // Extract HDOP
+                    hdop: record.tags && record.tags['0x35'] ? record.tags['0x35'].value : null,
+                    
+                    // Extract status
+                    status: record.tags && record.tags['0x40'] ? record.tags['0x40'].value : null,
+                    
+                    // Extract voltages
+                    supplyVoltage: record.tags && record.tags['0x41'] ? record.tags['0x41'].value : null,
+                    batteryVoltage: record.tags && record.tags['0x42'] ? record.tags['0x42'].value : null,
+                    
+                    // Extract temperature
+                    temperature: record.tags && record.tags['0x43'] ? record.tags['0x43'].value : null,
+                    
+                    // Extract outputs and inputs
+                    outputs: record.tags && record.tags['0x45'] ? record.tags['0x45'].value : null,
+                    inputs: record.tags && record.tags['0x46'] ? record.tags['0x46'].value : null,
+                    
+                    // Extract input voltages
+                    inputVoltage0: record.tags && record.tags['0x50'] ? record.tags['0x50'].value : null,
+                    inputVoltage1: record.tags && record.tags['0x51'] ? record.tags['0x51'].value : null,
+                    inputVoltage2: record.tags && record.tags['0x52'] ? record.tags['0x52'].value : null,
+                    inputVoltage3: record.tags && record.tags['0x53'] ? record.tags['0x53'].value : null,
+                    inputVoltage4: record.tags && record.tags['0x54'] ? record.tags['0x54'].value : null,
+                    inputVoltage5: record.tags && record.tags['0x55'] ? record.tags['0x55'].value : null,
+                    
+                    // Extract user data
+                    userData0: record.tags && record.tags['0xe2'] ? record.tags['0xe2'].value : null,
+                    userData1: record.tags && record.tags['0xe3'] ? record.tags['0xe3'].value : null,
+                    userData2: record.tags && record.tags['0xe4'] ? record.tags['0xe4'].value : null,
+                    
+                    // Extract modbus data
+                    modbus0: record.tags && record.tags['0x0001'] ? record.tags['0x0001'].value : null,
+                    modbus1: record.tags && record.tags['0x0002'] ? record.tags['0x0002'].value : null,
+                    
+                    // Keep original tags for debugging
+                    tags: record.tags || {},
+                    
+                    // Add archive number if available
+                    archiveNumber: record.tags && record.tags['0x10'] ? record.tags['0x10'].value : null,
+                    
+                    // Add datetime if available
+                    datetime: record.tags && record.tags['0x20'] ? record.tags['0x20'].value : null,
+                    milliseconds: record.tags && record.tags['0x21'] ? record.tags['0x21'].value : null
+                };
+                
+                // Add to parsed data
+                parsedData.push(enhancedRecord);
+                
+                // Update device tracking
+                updateDeviceTracking(recordIMEI, clientAddress, enhancedRecord);
+                
+                processedRecords++;
             }
             
-            // If no IMEI in this record, try to get from connection mapping
-            if (!deviceIMEI && clientAddress) {
-                // Try to get IMEI from connection mapping
-                deviceIMEI = getIMEIFromConnection(clientAddress);
-                console.log(`📱 Got IMEI from connection mapping: ${deviceIMEI}`);
+            const endTime = Date.now();
+            const processingTime = endTime - startTime;
+            const recordsPerSecond = Math.round((processedRecords / processingTime) * 1000);
+            const msPerRecord = (processingTime / processedRecords).toFixed(2);
+            
+            console.log(`✅ PARSER FIXED: ${processedRecords} records processed in ${processingTime}ms`);
+            console.log(`⚡ Performance: ${recordsPerSecond} records/second`);
+            console.log(`📊 Speed: ${msPerRecord}ms per record`);
+            
+            // Count total tags found
+            const totalTags = data.records.reduce((count, record) => {
+                return count + (record.tags ? Object.keys(record.tags).length : 0);
+            }, 0);
+            console.log(`🔍 Tags found: ${totalTags}`);
+            
+            // Show memory usage
+            console.log(`💾 Storage: ${parsedData.length}/${MAX_RECORDS} records in memory`);
+            console.log(`📱 Active devices: ${devices.size}`);
+            
+            // Check if we need to trim data to prevent memory issues
+            if (parsedData.length > MAX_RECORDS * 0.9) { // 90% of max
+                const recordsToRemove = parsedData.length - MAX_RECORDS;
+                parsedData.splice(0, recordsToRemove);
+                console.log(`🧹 Memory management: Removed ${recordsToRemove} old records to prevent memory overflow`);
             }
             
-            console.log(`📱 Final device IMEI for record: ${deviceIMEI}`);
+        } else {
+            // Handle single record (legacy format)
+            console.log('Processing single record (legacy format)');
             
-            // Extract common fields from tags
-            const extractedData = {
+            const enhancedRecord = {
                 timestamp: new Date().toISOString(),
-                deviceId: deviceIMEI || 'unknown',
-                imei: deviceIMEI || null,
+                deviceId: imei || data.deviceId || 'unknown',
+                imei: imei || data.imei || 'unknown',
                 clientAddress: clientAddress,
-                latitude: null,
-                longitude: null,
-                satellites: null,
-                correctness: null,
-                speed: null,
-                direction: null,
-                altitude: null,
-                course: null,
-                hdop: null,
-                vdop: null,
-                pdop: null,
-                temperature: null,
-                voltage: null,
-                inputs: null,
-                outputs: null,
-                status: null,
-                rawData: data,
-                tags: tags,
-                recordIndex: recordIndex + 1,
-                totalRecords: data.records.length
+                ...data
             };
             
-            // Extract coordinates (tag 0x30)
-            if (tags['0x30']) {
-                const coords = tags['0x30'].value;
-                if (coords && typeof coords === 'object') {
-                    extractedData.latitude = coords.latitude;
-                    extractedData.longitude = coords.longitude;
-                    extractedData.satellites = coords.satellites;
-                    extractedData.correctness = coords.correctness;
-                }
-            }
+            parsedData.push(enhancedRecord);
             
-            // Extract speed and direction (tag 0x33)
-            if (tags['0x33']) {
-                const speedDir = tags['0x33'].value;
-                if (speedDir && typeof speedDir === 'object') {
-                    extractedData.speed = speedDir.speed;
-                    extractedData.direction = speedDir.direction;
-                }
-            }
-            
-            // Extract altitude/height (tag 0x34)
-            if (tags['0x34']) {
-                extractedData.altitude = tags['0x34'].value;
-                extractedData.height = tags['0x34'].value; // Also set height for frontend compatibility
-            }
-            
-            // Extract HDOP (tag 0x35)
-            if (tags['0x35']) {
-                extractedData.hdop = tags['0x35'].value;
-            }
-            
-            // Extract status (tag 0x40)
-            if (tags['0x40']) {
-                extractedData.status = tags['0x40'].value;
-            }
-            
-            // Extract supply voltage (tag 0x41)
-            if (tags['0x41']) {
-                extractedData.voltage = tags['0x41'].value;
-                extractedData.supplyVoltage = tags['0x41'].value; // Also set supplyVoltage for frontend compatibility
-            }
-            
-            // Extract battery voltage (tag 0x42)
-            if (tags['0x42']) {
-                extractedData.batteryVoltage = tags['0x42'].value;
-            }
-            
-            // Extract temperature (tag 0x43)
-            if (tags['0x43']) {
-                extractedData.temperature = tags['0x43'].value;
-            }
-            
-            // Extract outputs (tag 0x45)
-            if (tags['0x45']) {
-                extractedData.outputs = tags['0x45'].value;
-            }
-            
-            // Extract inputs (tag 0x46)
-            if (tags['0x46']) {
-                extractedData.inputs = tags['0x46'].value;
-            }
-            
-            // Extract input voltages (tags 0x50, 0x51, 0x52)
-            if (tags['0x50']) {
-                extractedData.inputVoltage0 = tags['0x50'].value;
-            }
-            if (tags['0x51']) {
-                extractedData.inputVoltage1 = tags['0x51'].value;
-            }
-            if (tags['0x52']) {
-                extractedData.inputVoltage2 = tags['0x52'].value;
-            }
-            
-            // Extract date/time (tag 0x20)
-            if (tags['0x20']) {
-                extractedData.datetime = tags['0x20'].value;
-            }
-            
-            // Extract milliseconds (tag 0x21)
-            if (tags['0x21']) {
-                extractedData.milliseconds = tags['0x21'].value;
-            }
-            
-            // Add to data array
-            parsedData.unshift(extractedData);
-            
-            // Limit data to last MAX_RECORDS
-            if (parsedData.length > MAX_RECORDS) {
-                parsedData = parsedData.slice(0, MAX_RECORDS);
-            }
-            
-            // Update device tracking
-            if (deviceIMEI) {
-                updateDeviceTracking(deviceIMEI, clientAddress, extractedData);
+            if (imei) {
+                updateDeviceTracking(imei, clientAddress, enhancedRecord);
             }
         }
         
-        // Calculate performance metrics
-        const endTime = Date.now();
-        const processingTime = endTime - startTime;
-        const recordsPerSecond = (recordCount / processingTime) * 1000;
-        
-        // OPTIMIZED LOGGING - Show performance results
-        console.log(`✅ PARSER FIXED: ${recordCount} records processed in ${processingTime}ms`);
-        console.log(`⚡ Performance: ${recordsPerSecond.toFixed(0)} records/second`);
-        console.log(`📊 Speed: ${(processingTime / recordCount).toFixed(2)}ms per record`);
-        console.log(`🔍 Tags found: ${data.records.map(r => Object.keys(r.tags).length).join(', ')}`);
-        console.log(`💾 Storage: ${parsedData.length}/${MAX_RECORDS} records in memory`);
-        console.log(`📱 Active devices: ${devices.size}`);
-        
-        // Emit latest data to all connected Socket.IO clients
+        // Emit to Socket.IO clients
         if (parsedData.length > 0) {
-            io.emit('deviceData', parsedData[0]);
-            io.emit('deviceUpdate', parsedData[0]);
-            console.log('📡 Emitted device data to Socket.IO clients');
+            io.emit('deviceData', parsedData[parsedData.length - 1]);
         }
+        
+    } catch (error) {
+        logger.error('Error adding parsed data:', { error: error.message });
     }
 }
 
@@ -1379,6 +1389,7 @@ function handleAPIRequest(req, res) {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
     
+    // Set headers only once at the beginning
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -1519,7 +1530,7 @@ function handleAPIRequest(req, res) {
                 logger.error('Error deleting storage files:', { error: error.message });
             }
             
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.writeHead(200);
             res.end(JSON.stringify({ 
                 success: true, 
                 message: 'All data cleared successfully'
@@ -1536,7 +1547,6 @@ function handleAPIRequest(req, res) {
             };
             
             res.writeHead(200, {
-                'Content-Type': 'application/json',
                 'Content-Disposition': `attachment; filename="galileosky_data_${new Date().toISOString().replace(/[:.]/g, '-')}.json"`
             });
             res.end(JSON.stringify(exportData, null, 2));
@@ -1579,7 +1589,7 @@ function handleAPIRequest(req, res) {
                 devicesObject[imei] = deviceInfo;
             });
             
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.writeHead(200);
             res.end(JSON.stringify({
                 records: parsedData,
                 devices: devicesObject,
@@ -1594,8 +1604,11 @@ function handleAPIRequest(req, res) {
         }
     } catch (error) {
         logger.error('API error:', error);
-        res.writeHead(500);
-        res.end(JSON.stringify({ error: 'Internal server error' }));
+        // Only send error response if headers haven't been sent yet
+        if (!res.headersSent) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+        }
     }
 }
 
