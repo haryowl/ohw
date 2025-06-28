@@ -20,8 +20,12 @@ app.use(express.json({ limit: '50mb' }));
 
 // Data storage directory
 const DATA_DIR = path.join(__dirname, 'mobile-sync-data');
+const BACKUP_DIR = path.join(__dirname, 'mobile-sync-backups');
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
 // Store synchronized data
@@ -32,29 +36,150 @@ let syncData = {
     deviceStates: {} // Track which devices have synced
 };
 
-// Load existing sync data
+// Configuration
+const MAX_RECORDS = 100000; // Maximum records to keep in memory
+const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const MAX_BACKUPS = 10; // Keep last 10 backups
+
+// Load existing sync data with enhanced error handling
 function loadSyncData() {
     const syncFile = path.join(DATA_DIR, 'sync_data.json');
+    const backupFiles = getBackupFiles();
+    
+    // Try to load from main file first
     if (fs.existsSync(syncFile)) {
         try {
             const data = JSON.parse(fs.readFileSync(syncFile, 'utf8'));
             syncData = { ...syncData, ...data };
-            console.log(`Loaded sync data: ${syncData.records.length} records, ${Object.keys(syncData.devices).length} devices`);
+            console.log(`✅ Loaded sync data: ${syncData.records.length} records, ${Object.keys(syncData.devices).length} devices`);
+            return;
         } catch (error) {
-            console.error('Error loading sync data:', error);
+            console.error('❌ Error loading main sync data:', error.message);
         }
     }
+    
+    // Try to load from latest backup if main file failed
+    if (backupFiles.length > 0) {
+        const latestBackup = backupFiles[backupFiles.length - 1];
+        try {
+            const data = JSON.parse(fs.readFileSync(latestBackup, 'utf8'));
+            syncData = { ...syncData, ...data };
+            console.log(`✅ Loaded sync data from backup: ${syncData.records.length} records, ${Object.keys(syncData.devices).length} devices`);
+            
+            // Restore main file from backup
+            fs.copyFileSync(latestBackup, syncFile);
+            console.log('✅ Restored main data file from backup');
+            return;
+        } catch (error) {
+            console.error('❌ Error loading from backup:', error.message);
+        }
+    }
+    
+    // If all else fails, start with empty data
+    console.log('⚠️ Starting with empty sync data');
+    syncData = {
+        devices: {},
+        records: [],
+        lastUpdate: null,
+        deviceStates: {}
+    };
 }
 
-// Save sync data
+// Enhanced save sync data with backup
 function saveSyncData() {
     try {
         const syncFile = path.join(DATA_DIR, 'sync_data.json');
+        
+        // Create backup before saving
+        createBackup();
+        
+        // Save main data
         fs.writeFileSync(syncFile, JSON.stringify(syncData, null, 2));
-        console.log(`Sync data saved: ${syncData.records.length} records`);
+        console.log(`✅ Sync data saved: ${syncData.records.length} records`);
+        
+        // Clean up old backups
+        cleanupOldBackups();
+        
     } catch (error) {
-        console.error('Error saving sync data:', error);
+        console.error('❌ Error saving sync data:', error);
     }
+}
+
+// Create backup of current data
+function createBackup() {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupFile = path.join(BACKUP_DIR, `sync_data_backup_${timestamp}.json`);
+        fs.writeFileSync(backupFile, JSON.stringify(syncData, null, 2));
+        console.log(`💾 Backup created: ${backupFile}`);
+    } catch (error) {
+        console.error('❌ Error creating backup:', error);
+    }
+}
+
+// Get list of backup files
+function getBackupFiles() {
+    try {
+        const files = fs.readdirSync(BACKUP_DIR);
+        return files
+            .filter(file => file.startsWith('sync_data_backup_') && file.endsWith('.json'))
+            .map(file => path.join(BACKUP_DIR, file))
+            .sort();
+    } catch (error) {
+        console.error('❌ Error reading backup directory:', error);
+        return [];
+    }
+}
+
+// Clean up old backups
+function cleanupOldBackups() {
+    try {
+        const backupFiles = getBackupFiles();
+        if (backupFiles.length > MAX_BACKUPS) {
+            const filesToDelete = backupFiles.slice(0, backupFiles.length - MAX_BACKUPS);
+            filesToDelete.forEach(file => {
+                fs.unlinkSync(file);
+                console.log(`🗑️ Deleted old backup: ${file}`);
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error cleaning up backups:', error);
+    }
+}
+
+// Data recovery function
+function recoverData() {
+    console.log('🔧 Attempting data recovery...');
+    
+    const backupFiles = getBackupFiles();
+    if (backupFiles.length === 0) {
+        console.log('⚠️ No backup files found for recovery');
+        return false;
+    }
+    
+    // Try to recover from the most recent backup
+    for (let i = backupFiles.length - 1; i >= 0; i--) {
+        try {
+            const backupFile = backupFiles[i];
+            const data = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
+            
+            if (data.records && Array.isArray(data.records)) {
+                syncData = { ...syncData, ...data };
+                console.log(`✅ Data recovered from backup: ${syncData.records.length} records`);
+                
+                // Save recovered data to main file
+                const syncFile = path.join(DATA_DIR, 'sync_data.json');
+                fs.writeFileSync(syncFile, JSON.stringify(syncData, null, 2));
+                console.log('✅ Recovered data saved to main file');
+                return true;
+            }
+        } catch (error) {
+            console.error(`❌ Failed to recover from backup ${i}:`, error.message);
+        }
+    }
+    
+    console.log('❌ Data recovery failed');
+    return false;
 }
 
 // API Routes
@@ -185,15 +310,72 @@ app.get('/api/sync/data', (req, res) => {
 
 // Clear all data
 app.post('/api/sync/clear', (req, res) => {
-    syncData = {
-        devices: {},
-        records: [],
-        lastUpdate: null,
-        deviceStates: {}
-    };
-    saveSyncData();
-    io.emit('dataCleared');
-    res.json({ success: true, message: 'All data cleared' });
+    try {
+        // Create backup before clearing
+        createBackup();
+        
+        syncData = {
+            devices: {},
+            records: [],
+            lastUpdate: null,
+            deviceStates: {}
+        };
+        saveSyncData();
+        io.emit('dataCleared');
+        res.json({ success: true, message: 'All data cleared (backup created)' });
+    } catch (error) {
+        console.error('❌ Error clearing data:', error);
+        res.status(500).json({ error: 'Failed to clear data' });
+    }
+});
+
+// Recover data from backup
+app.post('/api/sync/recover', (req, res) => {
+    try {
+        const recovered = recoverData();
+        if (recovered) {
+            io.emit('dataRecovered', {
+                totalRecords: syncData.records.length,
+                totalDevices: Object.keys(syncData.devices).length
+            });
+            res.json({ 
+                success: true, 
+                message: 'Data recovered successfully',
+                totalRecords: syncData.records.length,
+                totalDevices: Object.keys(syncData.devices).length
+            });
+        } else {
+            res.status(404).json({ error: 'No backup data found to recover' });
+        }
+    } catch (error) {
+        console.error('❌ Error recovering data:', error);
+        res.status(500).json({ error: 'Failed to recover data' });
+    }
+});
+
+// Get backup information
+app.get('/api/sync/backups', (req, res) => {
+    try {
+        const backupFiles = getBackupFiles();
+        const backups = backupFiles.map(file => {
+            const stats = fs.statSync(file);
+            return {
+                filename: path.basename(file),
+                size: stats.size,
+                created: stats.birthtime,
+                modified: stats.mtime
+            };
+        });
+        
+        res.json({
+            backups: backups,
+            totalBackups: backups.length,
+            maxBackups: MAX_BACKUPS
+        });
+    } catch (error) {
+        console.error('❌ Error getting backup info:', error);
+        res.status(500).json({ error: 'Failed to get backup information' });
+    }
 });
 
 // Socket.IO for real-time updates

@@ -85,6 +85,9 @@ app.use('/api/mapping', require('./routes/mapping'));
 app.use('/api/records', recordsRouter);
 app.use('/api/peer', require('./routes/peer'));
 
+// Add peer sync routing for direct peer-to-peer communication
+app.use('/peer', require('./routes/peer'));
+
 // TCP Server for device connections
 const tcpServer = net.createServer((socket) => {
     const clientAddress = `${socket.remoteAddress}:${socket.remotePort}`;
@@ -280,47 +283,6 @@ tcpServer.on('error', (error) => {
 // Handle server close
 tcpServer.on('close', () => {
     logger.info('TCP server closed');
-});
-
-// Graceful shutdown handling
-process.on('SIGINT', async () => {
-    logger.info('Received SIGINT, starting graceful shutdown...');
-    
-    // Stop accepting new connections
-    tcpServer.close(() => {
-        logger.info('TCP server stopped accepting new connections');
-    });
-    
-    // Clear packet queue
-    await packetQueue.clear();
-    
-    // Close HTTP server
-    server.close(() => {
-        logger.info('HTTP server closed');
-        process.exit(0);
-    });
-});
-
-process.on('SIGTERM', async () => {
-    logger.info('Received SIGTERM, starting graceful shutdown...');
-    
-    // Stop accepting new connections
-    tcpServer.close(() => {
-        logger.info('TCP server stopped accepting new connections');
-    });
-    
-    // Clear packet queue
-    await packetQueue.clear();
-    
-    // Close HTTP server
-    server.close(() => {
-        logger.info('HTTP server closed');
-        process.exit(0);
-    });
-});
-
-server.listen(config.http.port, '0.0.0.0', () => {
-    logger.info(`HTTP server listening on port ${config.http.port} (all interfaces)`);
 });
 
 // Error handling middleware
