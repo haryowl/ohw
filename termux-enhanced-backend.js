@@ -587,7 +587,7 @@ async function parseMainPacket(buffer, offset = 0, actualLength) {
                 const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
                 const definition = tagDefinitions[tagHex];
 
-                console.log(`🔍 Record ${recordIndex + 1}: Processing tag ${tagHex} at position ${recordOffset - 1}`);
+                console.log(`🔍 Small packet: Processing tag ${tagHex} at position ${recordOffset - 1}`);
                 
                 if (!definition) {
                     console.warn(`Unknown tag: ${tagHex}`);
