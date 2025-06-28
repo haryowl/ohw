@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galileosky Parser - Mobile Tracking</title>
+    <title>OHW Parser - Mobile Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
@@ -526,7 +526,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Galileosky Parser</h1>
+            <h1>OHW Parser</h1>
             <p>Mobile Tracking & Real-time Monitoring</p>
         </div>
 
@@ -554,7 +554,9 @@
                 <div style="font-size: 0.8em; color: #666;">
                     <strong>Connection Info:</strong><br>
                     API: <span id="apiUrlDisplay">Loading...</span><br>
-                    Socket: <span id="socketUrlDisplay">Loading...</span>
+                    Socket: <span id="socketUrlDisplay">Loading...</span><br>
+                    Public IP: <span id="publicIpDisplay">Loading...</span><br>
+                    Local IP: <span id="localIpDisplay">Loading...</span>
                 </div>
             </div>
 
@@ -692,7 +694,7 @@
             initializeMaps();
             loadDevices();
             setupDateTimeDefaults();
-            updateConnectionInfo();
+            updateConnectionInfo(); // This is now async
             // Auto-connect when page loads with retry logic
             setTimeout(() => {
                 connectSocket();
@@ -1300,16 +1302,76 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `galileosky_data_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `ohw_data_${new Date().toISOString().split('T')[0]}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         }
 
-        function updateConnectionInfo() {
+        async function updateConnectionInfo() {
             document.getElementById('apiUrlDisplay').textContent = config.apiUrl;
             document.getElementById('socketUrlDisplay').textContent = config.socketUrl;
+            
+            // Fetch public IP address
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('publicIpDisplay').textContent = data.ip;
+                } else {
+                    throw new Error('Failed to fetch public IP');
+                }
+            } catch (error) {
+                console.log('Could not fetch public IP:', error.message);
+                document.getElementById('publicIpDisplay').textContent = 'Not available';
+            }
+            
+            // Fetch local IP address using WebRTC
+            try {
+                const rtc = new RTCPeerConnection({iceServers:[]});
+                rtc.createDataChannel('');
+                rtc.createOffer().then(offer => rtc.setLocalDescription(offer));
+                
+                let localIpFound = false;
+                rtc.onicecandidate = (event) => {
+                    if (event.candidate && !localIpFound) {
+                        const ipMatch = event.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+                        if (ipMatch && ipMatch[1] !== '127.0.0.1' && !ipMatch[1].startsWith('169.254')) {
+                            document.getElementById('localIpDisplay').textContent = ipMatch[1];
+                            localIpFound = true;
+                            rtc.close();
+                        }
+                    }
+                };
+                
+                // Timeout after 3 seconds
+                setTimeout(() => {
+                    if (document.getElementById('localIpDisplay').textContent === 'Loading...') {
+                        // Try alternative method for local IP
+                        try {
+                            // Use a simple method to get local IP from network interfaces
+                            fetch('https://httpbin.org/ip')
+                                .then(response => response.json())
+                                .then(data => {
+                                    // This will show the IP as seen by the server (usually local network IP)
+                                    document.getElementById('localIpDisplay').textContent = data.origin.split(',')[0];
+                                })
+                                .catch(() => {
+                                    document.getElementById('localIpDisplay').textContent = window.location.hostname || 'Unknown';
+                                });
+                        } catch (altError) {
+                            document.getElementById('localIpDisplay').textContent = window.location.hostname || 'Unknown';
+                        }
+                    }
+                    rtc.close();
+                }, 3000);
+                
+            } catch (rtcError) {
+                console.log('Could not fetch local IP via WebRTC:', rtcError.message);
+                // Fallback to hostname
+                document.getElementById('localIpDisplay').textContent = window.location.hostname || 'Unknown';
+            }
         }
 
         async function downloadTrackingData() {
