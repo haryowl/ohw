@@ -1,12 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Galileosky Parser Mobile Installation Script
-# This script will set up the complete mobile application from scratch
+# OHW Parser - One-Command Mobile Installation Script
+# This script installs the OHW parser on a new mobile phone from scratch
 
-set -e  # Exit on any error
-
-echo "🚀 Starting Galileosky Parser Mobile Installation..."
-echo "=================================================="
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -17,198 +14,298 @@ NC='\033[0m' # No Color
 
 # Function to print colored output
 print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "${GREEN}[INFO]${NC} $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running in Termux
+print_header() {
+    echo -e "${BLUE}================================${NC}"
+    echo -e "${BLUE}  OHW Parser - Mobile Installer ${NC}"
+    echo -e "${BLUE}================================${NC}"
+}
+
+print_header
+
+print_status "Starting OHW Parser mobile installation..."
+
+# Check if we're in Termux
 if [ ! -d "/data/data/com.termux" ]; then
     print_error "This script must be run in Termux on Android"
     exit 1
 fi
 
-# Step 1: Update package lists and setup repositories
-print_status "Updating package lists and setting up repositories..."
+# Step 1: Update and install packages
+print_status "Step 1/8: Installing required packages..."
 pkg update -y
+pkg install nodejs git sqlite wget curl -y
 
-# Step 2: Install essential packages (Node.js includes npm)
-print_status "Installing essential packages..."
-pkg install -y git curl wget nodejs
-
-# Step 3: Verify installations
-print_status "Verifying installations..."
-if ! command -v node &> /dev/null; then
+# Verify installations
+if ! command -v node >/dev/null 2>&1; then
     print_error "Node.js installation failed"
-    print_status "Trying alternative installation method..."
-    
-    # Try installing from NodeSource if pkg fails
-    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-    pkg install -y nodejs
-    
-    if ! command -v node &> /dev/null; then
-        print_error "Node.js installation failed after retry"
-        exit 1
-    fi
-fi
-
-# Check if npm is available (it should be included with Node.js)
-if ! command -v npm &> /dev/null; then
-    print_warning "npm not found, installing separately..."
-    pkg install -y npm
-    
-    if ! command -v npm &> /dev/null; then
-        print_error "npm installation failed"
-        print_status "Trying to install npm via Node.js..."
-        # Try to install npm using Node.js
-        curl -L https://www.npmjs.org/install.sh | sh
-    fi
-fi
-
-if ! command -v git &> /dev/null; then
-    print_error "Git installation failed"
     exit 1
 fi
 
-print_success "All packages installed successfully"
-print_status "Node.js version: $(node --version)"
-print_status "npm version: $(npm --version)"
-print_status "Git version: $(git --version)"
+NODE_VERSION=$(node --version)
+NPM_VERSION=$(npm --version)
+print_status "Node.js: $NODE_VERSION, npm: $NPM_VERSION"
 
-# Step 4: Navigate to home directory
-cd /data/data/com.termux/files/home
+# Step 2: Download OHW Parser
+print_status "Step 2/8: Downloading OHW Parser..."
+cd ~
 
-# Step 5: Remove existing installation if present
 if [ -d "galileosky-parser" ]; then
-    print_warning "Existing installation found. Removing..."
+    print_warning "Project directory already exists, removing..."
     rm -rf galileosky-parser
 fi
 
-# Step 6: Clone repository
-print_status "Cloning Galileosky Parser repository..."
 git clone https://github.com/haryowl/galileosky-parser.git
+cd galileosky-parser
 
-if [ ! -d "galileosky-parser" ]; then
-    print_error "Repository cloning failed"
+if [ ! -f "package.json" ]; then
+    print_error "Failed to download OHW Parser"
     exit 1
 fi
 
-print_success "Repository cloned successfully"
+print_status "OHW Parser downloaded successfully"
 
-# Step 7: Navigate to project directory
-cd galileosky-parser
+# Step 3: Install dependencies
+print_status "Step 3/8: Installing dependencies..."
 
-# Step 8: Install Node.js dependencies
-print_status "Installing Node.js dependencies..."
-npm install
+# Install root dependencies
+npm install --no-optional
 
-if [ $? -ne 0 ]; then
-    print_warning "npm install failed, trying with --force..."
-    npm install --force
-    
-    if [ $? -ne 0 ]; then
-        print_error "npm install failed even with --force"
-        print_status "Continuing without dependencies (some features may not work)"
+# Install backend dependencies
+cd backend
+npm install --no-optional
+cd ..
+
+# Install frontend dependencies
+cd frontend
+npm install --no-optional
+cd ..
+
+print_status "Dependencies installed successfully"
+
+# Step 4: Setup frontend
+print_status "Step 4/8: Setting up frontend..."
+
+# Create build directory
+mkdir -p frontend/build
+
+# Try to build frontend, fallback to simple frontend if it fails
+cd frontend
+if npm run build 2>/dev/null; then
+    print_status "Frontend built successfully"
+else
+    print_warning "Frontend build failed, using simple frontend"
+    cp ../simple-frontend.html build/index.html
+fi
+cd ..
+
+# Step 5: Configure mobile settings
+print_status "Step 5/8: Configuring mobile settings..."
+
+# Create data directories
+mkdir -p backend/data backend/logs
+
+# Create mobile configuration
+cd backend
+cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3001
+TCP_PORT=3003
+WS_PORT=3001
+DATABASE_URL=sqlite://./data/mobile.sqlite
+LOG_LEVEL=warn
+MAX_PACKET_SIZE=512
+CORS_ORIGIN=*
+EOF
+cd ..
+
+print_status "Mobile configuration created"
+
+# Step 6: Create management scripts
+print_status "Step 6/8: Creating management scripts..."
+
+# Create start script
+cat > ~/ohw-start.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "🚀 Starting OHW Parser..."
+
+cd ~/galileosky-parser
+
+# Check if already running
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        echo "✅ Server is already running (PID: $PID)"
+        exit 0
     fi
 fi
 
-print_success "Dependencies installed successfully"
+# Start the server
+nohup node backend/src/server.js > "$HOME/ohw-server.log" 2>&1 &
+SERVER_PID=$!
 
-# Step 9: Create necessary directories
-print_status "Creating necessary directories..."
-mkdir -p config data logs output
+# Save the PID
+echo $SERVER_PID > "$HOME/ohw-server.pid"
 
-# Step 10: Create configuration file
-print_status "Creating configuration file..."
-cat > config/config.json << 'EOF'
-{
-  "port": 3000,
-  "host": "0.0.0.0",
-  "database": {
-    "path": "./data/parser.db"
-  },
-  "logging": {
-    "level": "info",
-    "file": "./logs/parser.log"
-  }
-}
+# Wait and check if started successfully
+sleep 3
+if kill -0 $SERVER_PID 2>/dev/null; then
+    echo "✅ Server started successfully (PID: $SERVER_PID)"
+    echo "🌐 Local URL: http://localhost:3001"
+    
+    # Get IP address
+    IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
+    if [ -n "$IP_ADDRESSES" ]; then
+        echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+    fi
+else
+    echo "❌ Failed to start server"
+    rm -f "$HOME/ohw-server.pid"
+    exit 1
+fi
 EOF
 
-# Step 11: Create startup script
-print_status "Creating startup script..."
-cat > start-mobile-server.sh << 'EOF'
+# Create status script
+cat > ~/ohw-status.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/galileosky-parser
-echo "🚀 Starting Galileosky Parser Mobile Server..."
-echo "📱 Access the interface at: http://localhost:3000"
-echo "🌐 Or from other devices: http://$(ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "localhost"):3000"
-echo "⏹️  Press Ctrl+C to stop the server"
-echo ""
-node termux-enhanced-backend.js
+
+echo "📊 OHW Parser Status"
+echo "==================="
+
+# Check if server is running
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        echo "✅ Server is running (PID: $PID)"
+        echo "🌐 Local URL: http://localhost:3001"
+        
+        # Get IP addresses
+        IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
+        if [ -n "$IP_ADDRESSES" ]; then
+            echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+        fi
+        
+        # Show recent logs
+        echo ""
+        echo "📋 Recent Logs:"
+        if [ -f "$HOME/ohw-server.log" ]; then
+            tail -5 "$HOME/ohw-server.log"
+        else
+            echo "No logs found"
+        fi
+    else
+        echo "❌ Server is not running (PID file exists but process not found)"
+    fi
+else
+    echo "❌ Server is not running (no PID file)"
+fi
 EOF
 
-chmod +x start-mobile-server.sh
-
-# Step 12: Create peer sync startup script
-print_status "Creating peer sync startup script..."
-cat > start-peer-sync.sh << 'EOF'
+# Create stop script
+cat > ~/ohw-stop.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/galileosky-parser
-echo "🚀 Starting Galileosky Parser with Peer Sync..."
-echo "📱 Access the peer sync interface at: http://localhost:3001/mobile-peer-sync-ui.html"
-echo "🌐 Or from other devices: http://$(ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "localhost"):3001/mobile-peer-sync-ui.html"
-echo "⏹️  Press Ctrl+C to stop the server"
-echo ""
-node termux-peer-sync-backend.js
+
+echo "🛑 Stopping OHW Parser..."
+
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        kill $PID
+        echo "✅ Server stopped (PID: $PID)"
+        rm -f "$HOME/ohw-server.pid"
+    else
+        echo "❌ Server was not running"
+        rm -f "$HOME/ohw-server.pid"
+    fi
+else
+    echo "❌ No PID file found"
+fi
 EOF
 
-chmod +x start-peer-sync.sh
+# Create restart script
+cat > ~/ohw-restart.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
 
-# Step 13: Get IP address
-IP_ADDRESS=$(ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "localhost")
+echo "🔄 Restarting OHW Parser..."
 
-# Step 14: Display installation summary
+# Stop if running
+if [ -f "$HOME/ohw-stop.sh" ]; then
+    source "$HOME/ohw-stop.sh"
+fi
+
+# Wait a moment
+sleep 2
+
+# Start again
+if [ -f "$HOME/ohw-start.sh" ]; then
+    source "$HOME/ohw-start.sh"
+    echo "✅ Server restarted"
+else
+    echo "❌ Start script not found"
+fi
+EOF
+
+# Make all scripts executable
+chmod +x ~/ohw-*.sh
+
+print_status "Management scripts created"
+
+# Step 7: Test the installation
+print_status "Step 7/8: Testing the installation..."
+
+# Start the server
+~/ohw-start.sh
+
+# Wait a moment for server to fully start
+sleep 5
+
+# Check if server is running
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        print_status "✅ Server test successful"
+    else
+        print_error "❌ Server test failed"
+        exit 1
+    fi
+else
+    print_error "❌ Server test failed - no PID file"
+    exit 1
+fi
+
+# Step 8: Installation complete
+print_status "Step 8/8: Installation complete!"
+
 echo ""
-echo "🎉 Installation Complete!"
-echo "========================"
-echo ""
-print_success "Galileosky Parser Mobile has been installed successfully!"
-echo ""
-echo "📱 To start the server:"
-echo "   cd /data/data/com.termux/files/home/galileosky-parser"
-echo "   ./start-mobile-server.sh"
-echo ""
-echo "🔄 To start with peer sync:"
-echo "   ./start-peer-sync.sh"
-echo ""
-echo "🌐 Access the interfaces:"
-echo "   Mobile Interface:  http://localhost:3000"
-echo "   Peer Sync Interface: http://localhost:3001/mobile-peer-sync-ui.html"
-echo "   Remote Access: http://${IP_ADDRESS}:3000"
-echo "   Remote Peer Sync: http://${IP_ADDRESS}:3001/mobile-peer-sync-ui.html"
+echo -e "${GREEN}🎉 OHW Parser installed successfully!${NC}"
 echo ""
 echo "📋 Available commands:"
-echo "   ./start-mobile-server.sh  - Start the server"
-echo "   ./start-peer-sync.sh      - Start with peer sync"
-echo "   node termux-enhanced-backend.js  - Start enhanced backend"
-echo "   node termux-simple-backend.js    - Start simple backend"
-echo "   bash termux-quick-start.sh       - Quick start script"
+echo "  ~/ohw-start.sh   - Start the server"
+echo "  ~/ohw-status.sh  - Check server status"
+echo "  ~/ohw-stop.sh    - Stop the server"
+echo "  ~/ohw-restart.sh - Restart the server"
 echo ""
-echo "📚 For detailed instructions, see:"
-echo "   MOBILE_INSTALLATION_GUIDE.md"
-echo "   MOBILE_QUICK_REFERENCE.md"
-echo "   PEER_SYNC_README.md"
+echo "🌐 Access URLs:"
+echo "  Local:  http://localhost:3001"
+IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
+if [ -n "$IP_ADDRESSES" ]; then
+    echo "  Network: http://$IP_ADDRESSES:3001"
+fi
 echo ""
-print_warning "Remember to keep your phone plugged in when running the server!"
+echo "📱 Next steps:"
+echo "  1. Open your browser and go to the URLs above"
+echo "  2. Configure your tracking devices to send data"
+echo "  3. Monitor logs with: tail -f ~/ohw-server.log"
 echo ""
-echo "🚀 Ready to start? Run: ./start-mobile-server.sh" 
+echo -e "${BLUE}The OHW Parser is now ready to receive tracking data!${NC}" 

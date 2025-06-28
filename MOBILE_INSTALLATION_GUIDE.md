@@ -1,330 +1,470 @@
-# 📱 Galileosky Parser Mobile Installation Guide
+# 📱 OHW Parser - Complete Mobile Installation Guide
 
 ## 🎯 Overview
-This guide will help you set up the Galileosky parser mobile application on a new Android phone from scratch. The application will run a backend server that can receive and parse Galileosky device data.
+This guide will help you install the OHW parser on a new Android phone from scratch. The parser will run as a mobile server that can receive and process tracking data.
 
 ## 📋 Prerequisites
-- Android phone (Android 7.0 or higher recommended)
-- Internet connection for initial setup
-- At least 500MB free storage space
+- **Android 7.0+** (API 24+)
+- **2GB+ free storage**
+- **Internet connection** (for initial setup)
+- **Basic Android knowledge**
 
 ---
 
 ## 🚀 Step 1: Install Termux
 
-### Option A: Install from F-Droid (Recommended)
-1. **Download F-Droid**
-   - Open your browser and go to: https://f-droid.org/
-   - Download the F-Droid APK file
-   - Install the APK (allow installation from unknown sources if prompted)
+### Option A: F-Droid (Recommended)
+1. **Download F-Droid** from https://f-droid.org/
+2. **Install F-Droid** on your phone
+3. **Open F-Droid** and search for "Termux"
+4. **Install Termux** from the official repository
 
-2. **Install Termux from F-Droid**
-   - Open F-Droid app
-   - Search for "Termux"
-   - Install Termux (this is the official version with full functionality)
-
-### Option B: Install from Google Play Store (Limited)
-- Search for "Termux" in Google Play Store
-- Install Termux (note: this version has limited functionality)
+### Option B: Google Play Store
+1. **Open Google Play Store**
+2. **Search for "Termux"**
+3. **Install Termux** (official version)
 
 ---
 
 ## 🔧 Step 2: Initial Termux Setup
 
-1. **Open Termux**
-   - Launch the Termux app from your app drawer
-
-2. **Update package lists**
-   ```bash
-   pkg update
-   ```
-
-3. **Install essential packages**
-   ```bash
-   pkg install -y git curl wget nodejs npm
-   ```
-
-4. **Verify installations**
-   ```bash
-   node --version
-   npm --version
-   git --version
-   ```
-
----
-
-## 📥 Step 3: Download the Galileosky Parser
-
-1. **Navigate to a suitable directory**
-   ```bash
-   cd /data/data/com.termux/files/home
-   ```
-
-2. **Clone the repository**
-   ```bash
-   git clone https://github.com/haryowl/galileosky-parser.git
-   ```
-
-3. **Navigate to the project directory**
-   ```bash
-   cd galileosky-parser
-   ```
-
-4. **Verify the files are downloaded**
-   ```bash
-   ls -la
-   ```
-
----
-
-## ⚙️ Step 4: Install Dependencies
-
-1. **Install Node.js dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Wait for installation to complete**
-   - This may take a few minutes depending on your internet speed
-
-3. **Verify installation**
-   ```bash
-   npm list --depth=0
-   ```
-
----
-
-## 🔧 Step 5: Configure the Application
-
-1. **Create configuration directory**
-   ```bash
-   mkdir -p config
-   ```
-
-2. **Create basic configuration file**
-   ```bash
-   cat > config/config.json << 'EOF'
-   {
-     "port": 3000,
-     "host": "0.0.0.0",
-     "database": {
-       "path": "./data/parser.db"
-     },
-     "logging": {
-       "level": "info",
-       "file": "./logs/parser.log"
-     }
-   }
-   EOF
-   ```
-
-3. **Create necessary directories**
-   ```bash
-   mkdir -p data logs output
-   ```
-
----
-
-## 🚀 Step 6: Start the Mobile Backend
-
-### Option A: Use the Enhanced Backend (Recommended)
 ```bash
-node termux-enhanced-backend.js
+# Open Termux app on your phone
+
+# Update package list
+pkg update -y
+
+# Install essential packages
+pkg install nodejs git sqlite wget curl -y
+
+# Verify installations
+node --version
+npm --version
+git --version
 ```
 
-### Option B: Use the Simple Backend
-```bash
-node termux-simple-backend.js
+**Expected Output:**
 ```
-
-### Option C: Use the Quick Start Script
-```bash
-bash termux-quick-start.sh
+Node.js v18.x.x
+npm v9.x.x
+git version 2.x.x
 ```
 
 ---
 
-## 📱 Step 7: Access the Mobile Interface
+## 📥 Step 3: Download OHW Parser
 
-1. **Find your phone's IP address**
-   ```bash
-   ip addr show wlan0
-   ```
-   Look for the `inet` address (usually starts with 192.168.x.x or 10.x.x.x)
-
-2. **Open the mobile interface**
-   - Open your phone's browser
-   - Go to: `http://YOUR_IP_ADDRESS:3000`
-   - Example: `http://192.168.1.100:3000`
-
-3. **Alternative: Use localhost**
-   - If accessing from the same phone: `http://localhost:3000`
-
----
-
-## 🔧 Step 8: Configure Device Connection
-
-### For Galileosky Devices:
-1. **Configure device to send data to your phone**
-   - Device IP: Your phone's IP address
-   - Port: 3000
-   - Protocol: TCP/UDP (as configured in your device)
-
-2. **Test connection**
-   - Send a test packet from your device
-   - Check the mobile interface for received data
-
-### For Testing (Optional):
-1. **Use the test script**
-   ```bash
-   node test-mobile-parsing.js
-   ```
-
----
-
-## 📊 Step 9: Using the Mobile Interface
-
-### Available Tabs:
-1. **Dashboard**
-   - Real-time data display
-   - Connection status
-   - Device information
-
-2. **Data Tracking**
-   - View historical tracking data
-   - Download tracking data
-   - Map visualization
-
-3. **Data Export**
-   - Export data in CSV format
-   - Custom parameter selection
-   - Date range filtering
-
-4. **Settings**
-   - Configure API endpoints
-   - Connection settings
-   - System preferences
-
----
-
-## 🔄 Step 10: Auto-Start Setup (Optional)
-
-### Create a startup script:
 ```bash
-cat > start-mobile-server.sh << 'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/galileosky-parser
-node termux-enhanced-backend.js
-EOF
-```
+# Navigate to home directory
+cd ~
 
-### Make it executable:
-```bash
-chmod +x start-mobile-server.sh
-```
-
-### To start manually:
-```bash
-./start-mobile-server.sh
-```
-
----
-
-## 🛠️ Troubleshooting
-
-### Common Issues:
-
-1. **"Permission denied" errors**
-   ```bash
-   chmod +x *.sh
-   chmod +x *.js
-   ```
-
-2. **Port already in use**
-   ```bash
-   pkill -f node
-   # or change port in config.json
-   ```
-
-3. **Cannot access from other devices**
-   - Check firewall settings
-   - Verify IP address is correct
-   - Ensure both devices are on same network
-
-4. **Database errors**
-   ```bash
-   rm -rf data/parser.db
-   # Restart the application
-   ```
-
-5. **Node.js not found**
-   ```bash
-   pkg install nodejs npm
-   ```
-
-### Reset Everything:
-```bash
-cd /data/data/com.termux/files/home
-rm -rf galileosky-parser
+# Clone the OHW Parser repository
 git clone https://github.com/haryowl/galileosky-parser.git
+
+# Enter the project directory
 cd galileosky-parser
-npm install
+
+# Verify the download
+ls -la
+```
+
+**Expected Output:**
+```
+backend/  frontend/  simple-frontend.html  termux-*.sh  *.md
 ```
 
 ---
 
-## 📞 Support
+## 📦 Step 4: Install Dependencies
 
-### If you encounter issues:
-1. Check the logs: `tail -f logs/parser.log`
-2. Verify configuration: `cat config/config.json`
-3. Test network: `ping google.com`
-4. Check Node.js: `node --version`
-
-### Useful Commands:
 ```bash
-# View running processes
-ps aux | grep node
+# Install root dependencies
+npm install --no-optional
 
-# Check disk space
-df -h
+# Install backend dependencies
+cd backend
+npm install --no-optional
+cd ..
 
-# Check memory usage
-free -h
+# Install frontend dependencies
+cd frontend
+npm install --no-optional
+cd ..
+```
+
+**Note:** If you get build errors, that's normal - we'll use the pre-built frontend.
+
+---
+
+## 🏗️ Step 5: Build Frontend (Optional)
+
+### If Build Succeeds:
+```bash
+cd frontend
+npm run build
+cd ..
+```
+
+### If Build Fails (Most Common):
+```bash
+# Create a simple frontend directory
+mkdir -p frontend/build
+
+# Copy the simple frontend
+cp simple-frontend.html frontend/build/index.html
+```
+
+---
+
+## ⚙️ Step 6: Configure Mobile Settings
+
+```bash
+# Create data directories
+mkdir -p backend/data backend/logs
+
+# Create mobile configuration
+cd backend
+cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3001
+TCP_PORT=3003
+WS_PORT=3001
+DATABASE_URL=sqlite://./data/mobile.sqlite
+LOG_LEVEL=warn
+MAX_PACKET_SIZE=512
+CORS_ORIGIN=*
+EOF
+
+cd ..
+```
+
+---
+
+## 🚀 Step 7: Create Management Scripts
+
+```bash
+# Create start script
+cat > ~/ohw-start.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "🚀 Starting OHW Parser..."
+
+cd ~/galileosky-parser
+
+# Check if already running
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        echo "✅ Server is already running (PID: $PID)"
+        exit 0
+    fi
+fi
+
+# Start the server
+nohup node backend/src/server.js > "$HOME/ohw-server.log" 2>&1 &
+SERVER_PID=$!
+
+# Save the PID
+echo $SERVER_PID > "$HOME/ohw-server.pid"
+
+# Wait and check if started successfully
+sleep 3
+if kill -0 $SERVER_PID 2>/dev/null; then
+    echo "✅ Server started successfully (PID: $SERVER_PID)"
+    echo "🌐 Local URL: http://localhost:3001"
+    
+    # Get IP address
+    IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
+    if [ -n "$IP_ADDRESSES" ]; then
+        echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+    fi
+else
+    echo "❌ Failed to start server"
+    rm -f "$HOME/ohw-server.pid"
+    exit 1
+fi
+EOF
+
+# Create status script
+cat > ~/ohw-status.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "📊 OHW Parser Status"
+echo "==================="
+
+# Check if server is running
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        echo "✅ Server is running (PID: $PID)"
+        echo "🌐 Local URL: http://localhost:3001"
+        
+        # Get IP addresses
+        IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
+        if [ -n "$IP_ADDRESSES" ]; then
+            echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+        fi
+        
+        # Show recent logs
+        echo ""
+        echo "📋 Recent Logs:"
+        if [ -f "$HOME/ohw-server.log" ]; then
+            tail -5 "$HOME/ohw-server.log"
+        else
+            echo "No logs found"
+        fi
+    else
+        echo "❌ Server is not running (PID file exists but process not found)"
+    fi
+else
+    echo "❌ Server is not running (no PID file)"
+fi
+EOF
+
+# Create stop script
+cat > ~/ohw-stop.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "🛑 Stopping OHW Parser..."
+
+if [ -f "$HOME/ohw-server.pid" ]; then
+    PID=$(cat "$HOME/ohw-server.pid")
+    if kill -0 $PID 2>/dev/null; then
+        kill $PID
+        echo "✅ Server stopped (PID: $PID)"
+        rm -f "$HOME/ohw-server.pid"
+    else
+        echo "❌ Server was not running"
+        rm -f "$HOME/ohw-server.pid"
+    fi
+else
+    echo "❌ No PID file found"
+fi
+EOF
+
+# Create restart script
+cat > ~/ohw-restart.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "🔄 Restarting OHW Parser..."
+
+# Stop if running
+if [ -f "$HOME/ohw-stop.sh" ]; then
+    source "$HOME/ohw-stop.sh"
+fi
+
+# Wait a moment
+sleep 2
+
+# Start again
+if [ -f "$HOME/ohw-start.sh" ]; then
+    source "$HOME/ohw-start.sh"
+    echo "✅ Server restarted"
+else
+    echo "❌ Start script not found"
+fi
+EOF
+
+# Make all scripts executable
+chmod +x ~/ohw-*.sh
+```
+
+---
+
+## 🎯 Step 8: Start the Server
+
+```bash
+# Start the OHW Parser server
+~/ohw-start.sh
+```
+
+**Expected Output:**
+```
+🚀 Starting OHW Parser...
+✅ Server started successfully (PID: 12345)
+🌐 Local URL: http://localhost:3001
+📱 Network URL: http://192.168.1.100:3001
+```
+
+---
+
+## 🌐 Step 9: Access the Web Interface
+
+### Option A: Local Access
+1. **Open your phone's browser**
+2. **Go to:** `http://localhost:3001`
+3. **You should see the OHW Parser interface**
+
+### Option B: Network Access (Other Devices)
+1. **Use the Network URL** shown in the start output
+2. **Example:** `http://192.168.1.100:3001`
+3. **Other devices on the same network can access it**
+
+---
+
+## 📱 Step 10: Test the Installation
+
+```bash
+# Check server status
+~/ohw-status.sh
+
+# View real-time logs
+tail -f ~/ohw-server.log
+
+# Test web interface
+# Open browser and go to the URLs shown above
+```
+
+---
+
+## 🔄 Step 11: Auto-Start Setup (Optional)
+
+### Option A: Termux:Boot (Recommended)
+```bash
+# Install Termux:Boot app from F-Droid
+# https://f-droid.org/en/packages/com.termux.boot/
+
+# Create boot directory
+mkdir -p ~/.termux/boot
+
+# Copy boot script
+cp termux-boot-startup.sh ~/.termux/boot/ohw-parser-boot.sh
+
+# Make executable
+chmod +x ~/.termux/boot/ohw-parser-boot.sh
+```
+
+### Option B: Termux Widget
+```bash
+# Install Termux:Widget
+pkg install termux-widget -y
+
+# Create widget directory
+mkdir -p ~/.shortcuts
+
+# Create start widget
+cat > ~/.shortcuts/ohw-start << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+~/ohw-start.sh
+termux-toast "OHW Parser started"
+EOF
+
+# Create stop widget
+cat > ~/.shortcuts/ohw-stop << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+~/ohw-stop.sh
+termux-toast "OHW Parser stopped"
+EOF
+
+# Make widgets executable
+chmod +x ~/.shortcuts/ohw-*
+```
+
+---
+
+## 📋 Available Commands
+
+After installation, you have these commands:
+
+```bash
+# Start the server
+~/ohw-start.sh
+
+# Check status
+~/ohw-status.sh
+
+# Stop the server
+~/ohw-stop.sh
+
+# Restart the server
+~/ohw-restart.sh
+
+# View logs
+tail -f ~/ohw-server.log
 
 # View recent logs
-tail -20 logs/parser.log
+tail -20 ~/ohw-server.log
 ```
 
 ---
 
-## ✅ Verification Checklist
+## 🔍 Troubleshooting
 
-- [ ] Termux installed and working
-- [ ] Node.js and npm installed
-- [ ] Repository cloned successfully
-- [ ] Dependencies installed
-- [ ] Configuration file created
-- [ ] Backend server started
-- [ ] Mobile interface accessible
-- [ ] Device can connect to server
-- [ ] Data is being received and parsed
-- [ ] Mobile interface shows data correctly
+### Issue: "Permission denied"
+```bash
+# Fix script permissions
+chmod +x ~/ohw-*.sh
+```
+
+### Issue: "Port already in use"
+```bash
+# Kill existing processes
+pkill -f "node.*server.js"
+
+# Or use the stop script
+~/ohw-stop.sh
+```
+
+### Issue: "Node.js not found"
+```bash
+# Reinstall Node.js
+pkg install nodejs -y
+```
+
+### Issue: "Cannot access web interface"
+```bash
+# Check if server is running
+~/ohw-status.sh
+
+# Check firewall settings
+# Ensure Termux has network permissions
+```
+
+### Issue: "Build failed"
+```bash
+# This is normal - use the simple frontend
+cp simple-frontend.html frontend/build/index.html
+```
 
 ---
 
-## 🎉 Congratulations!
+## 📊 Verification Checklist
 
-Your Galileosky parser mobile application is now set up and ready to use! 
+- ✅ Termux installed and working
+- ✅ Node.js and npm installed
+- ✅ OHW Parser downloaded
+- ✅ Dependencies installed
+- ✅ Server starts successfully
+- ✅ Web interface accessible
+- ✅ Network URL working
+- ✅ Management scripts working
+
+---
+
+## 🎉 Success!
+
+Your OHW Parser is now running on your mobile phone! 
+
+**Key Information:**
+- **Local Access:** `http://localhost:3001`
+- **Network Access:** `http://[YOUR_IP]:3001`
+- **Status Check:** `~/ohw-status.sh`
+- **Logs:** `tail -f ~/ohw-server.log`
 
 **Next Steps:**
-1. Configure your Galileosky devices to send data to your phone
-2. Test the data reception and parsing
-3. Explore the mobile interface features
-4. Set up auto-start if needed
-
-**Remember:** Keep your phone connected to power when running the server for extended periods, as it will consume battery power.
+1. **Configure your tracking devices** to send data to the server
+2. **Set up peer-to-peer sync** if needed
+3. **Monitor the logs** for incoming data
+4. **Access the web interface** to view tracking data
 
 ---
 
-*For additional help, refer to the other documentation files in the repository or create an issue on GitHub.* 
+## 📞 Need Help?
+
+If you encounter issues:
+1. **Check the logs:** `tail -f ~/ohw-server.log`
+2. **Verify status:** `~/ohw-status.sh`
+3. **Restart server:** `~/ohw-restart.sh`
+4. **Check network:** Ensure your phone has internet access
+
+**The OHW Parser is now ready to receive and process tracking data!** 🚀 
