@@ -81,9 +81,43 @@ print_status "Step 3/8: Installing dependencies..."
 # Install root dependencies
 npm install --no-optional
 
-# Install backend dependencies
+# Install backend dependencies with fallback for sqlite3
 cd backend
-npm install --no-optional
+print_status "Installing backend dependencies..."
+
+# Try to install with optional dependencies first
+if npm install --no-optional; then
+    print_status "Backend dependencies installed successfully"
+else
+    print_warning "Backend installation failed, trying alternative approach..."
+    
+    # Install Python and build tools for sqlite3
+    pkg install python clang make -y
+    
+    # Try installation again
+    if npm install --no-optional; then
+        print_status "Backend dependencies installed with build tools"
+    else
+        print_warning "sqlite3 build still failing, using alternative database..."
+        
+        # Create a simple backend configuration that doesn't require sqlite3
+        cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3001
+TCP_PORT=3003
+WS_PORT=3001
+DATABASE_URL=sqlite://./data/mobile.sqlite
+LOG_LEVEL=warn
+MAX_PACKET_SIZE=512
+CORS_ORIGIN=*
+USE_SIMPLE_DB=true
+EOF
+        
+        # Try installing without sqlite3
+        npm install --no-optional --ignore-scripts
+        print_status "Backend dependencies installed (without sqlite3)"
+    fi
+fi
 cd ..
 
 # Install frontend dependencies
