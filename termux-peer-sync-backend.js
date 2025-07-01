@@ -437,7 +437,7 @@ function startHttpServer() {
     // API Routes
     app.get('/api/data', (req, res) => {
         res.json({
-            records: parsedData.slice(-100), // Last 100 records
+            records: parsedData, // Return ALL records for peer sync
             devices: Array.from(devices.entries()).map(([id, info]) => ({
                 deviceId: id,
                 lastSeen: info.lastSeen,

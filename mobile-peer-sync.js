@@ -86,8 +86,8 @@ class MobilePeerSync {
     // Save data to files (mobile backend style)
     saveData() {
         try {
-            // Save parsed data
-            const dataToSave = global.parsedData.slice(-10000); // Keep last 10k records
+            // Save parsed data - save ALL records for peer sync
+            const dataToSave = global.parsedData; // Save ALL records
             fs.writeFileSync(this.PARSED_DATA_FILE, JSON.stringify(dataToSave, null, 2));
             
             // Save devices data
