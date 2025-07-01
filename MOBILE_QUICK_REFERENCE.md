@@ -1,132 +1,199 @@
-# 📱 Mobile Setup Quick Reference
+# 📱 Galileosky Parser - Mobile Quick Reference
 
-## 🚀 Essential Commands
+## 🚀 One-Command Installation
 
-### 1. Install Termux & Dependencies
 ```bash
-# Update packages
-pkg update
-
-# Install essentials
-pkg install -y git curl wget nodejs npm
-
-# Verify
-node --version && npm --version
+# Download and run the installer
+curl -sSL https://raw.githubusercontent.com/haryowl/ohw/main/install-mobile.sh | bash
 ```
 
-### 2. Download & Setup
+## 📋 Prerequisites
+- **Android 7.0+** with Termux installed
+- **2GB+ free storage**
+- **Internet connection** (for initial setup)
+
+## 🔧 Installation Steps
+
+### 1. Install Termux
+- **F-Droid:** https://f-droid.org/ → Search "Termux"
+- **Google Play:** Search "Termux"
+
+### 2. Run Installation
 ```bash
-# Clone repository
-cd /data/data/com.termux/files/home
-git clone https://github.com/haryowl/galileosky-parser.git
-cd galileosky-parser
-
-# Install dependencies
-npm install
-
-# Create directories
-mkdir -p config data logs output
+# Open Termux and run:
+curl -sSL https://raw.githubusercontent.com/haryowl/ohw/main/install-mobile.sh | bash
 ```
 
-### 3. Quick Configuration
+### 3. Start the Server
 ```bash
-# Create config
-cat > config/config.json << 'EOF'
-{
-  "port": 3000,
-  "host": "0.0.0.0",
-  "database": { "path": "./data/parser.db" },
-  "logging": { "level": "info", "file": "./logs/parser.log" }
-}
-EOF
+~/galileosky-start.sh
 ```
 
-### 4. Start Server
+### 4. Access Interface
+- **Main Interface:** http://localhost:3001
+- **Mobile Interface:** http://localhost:3001/mobile
+- **Peer Sync:** http://localhost:3001/peer-sync
+
+## 📱 Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `~/galileosky-start.sh` | Start the server |
+| `~/galileosky-status.sh` | Check server status |
+| `~/galileosky-stop.sh` | Stop the server |
+| `~/galileosky-restart.sh` | Restart the server |
+
+## 🌐 Server Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 3001 | HTTP/WebSocket | Main web interface |
+| 3003 | TCP | Device data reception |
+| 3004 | Peer Sync | Peer-to-peer synchronization |
+
+## 🔄 Peer-to-Peer Sync Setup
+
+### Hotspot Phone (Primary)
+1. **Enable mobile hotspot**
+2. **Start server:** `~/galileosky-start.sh`
+3. **Note your IP address** from status output
+
+### Client Phone (Secondary)
+1. **Connect to hotspot WiFi**
+2. **Open browser:** `http://[HOTSPOT_IP]:3001/peer-sync`
+3. **Click "Connect to Peer"** and enter hotspot IP
+
+## 📊 Troubleshooting
+
+### Common Issues
+
+#### Server Won't Start
 ```bash
-# Enhanced backend (recommended)
-node termux-enhanced-backend.js
+# Check if port is in use
+netstat -tulpn | grep :3001
 
-# OR Simple backend
-node termux-simple-backend.js
+# Kill conflicting process
+kill -9 [PID]
 
-# OR Quick start script
-bash termux-quick-start.sh
+# Restart server
+~/galileosky-restart.sh
 ```
 
-### 5. Access Interface
+#### Permission Denied
 ```bash
-# Find IP address
-ip addr show wlan0
+# Fix script permissions
+chmod +x ~/galileosky-*.sh
 
-# Access in browser
-http://YOUR_IP:3000
-# OR
-http://localhost:3000
+# Fix project permissions
+chmod -R 755 ~/galileosky-parser
 ```
 
-## 🔧 Troubleshooting Commands
-
+#### Can't Access Web Interface
 ```bash
-# Kill existing processes
-pkill -f node
+# Check server status
+~/galileosky-status.sh
 
 # Check logs
-tail -f logs/parser.log
+tail -f ~/galileosky-server.log
 
-# Reset everything
-cd /data/data/com.termux/files/home
-rm -rf galileosky-parser
-git clone https://github.com/haryowl/galileosky-parser.git
-cd galileosky-parser && npm install
+# Verify IP address
+ip route get 1
+```
 
-# Fix permissions
-chmod +x *.sh *.js
+#### Database Issues
+```bash
+# Clear database and restart
+rm -f backend/data/mobile.sqlite
+~/galileosky-restart.sh
+```
 
-# Check disk space
-df -h
+## 📱 Mobile-Specific Features
 
-# View running processes
+### 1. Mobile Hotspot Mode
+- **Enable hotspot** on your phone
+- **Other devices connect** via WiFi
+- **Static IP setup** for stable connections
+
+### 2. Peer-to-Peer Sync
+- **Real-time data sync** between devices
+- **Bidirectional sync** with conflict resolution
+- **Device identification** using IMEI
+
+### 3. Mobile-Optimized Interface
+- **Touch-friendly controls**
+- **Responsive design**
+- **Offline capability**
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# Edit configuration
+nano backend/.env
+
+# Key settings:
+PORT=3001              # HTTP port
+TCP_PORT=3003          # TCP port for devices
+PEER_SYNC_PORT=3004    # Peer sync port
+LOG_LEVEL=info         # Log level (error, warn, info, debug)
+```
+
+### Custom Ports
+```bash
+# Change ports in .env file
+PORT=8080
+TCP_PORT=8081
+PEER_SYNC_PORT=8082
+
+# Restart server
+~/galileosky-restart.sh
+```
+
+## 📞 Support
+
+### Logs
+- **Server logs:** `~/galileosky-server.log`
+- **Application logs:** `backend/logs/`
+
+### Useful Commands
+```bash
+# View real-time logs
+tail -f ~/galileosky-server.log
+
+# Check disk usage
+du -sh ~/galileosky-parser
+
+# Check memory usage
 ps aux | grep node
+
+# Update to latest version
+cd ~/ohw && git pull origin main
 ```
 
-## 📱 Mobile Interface Tabs
+### GitHub Repository
+- **URL:** https://github.com/haryowl/ohw
+- **Issues:** Report problems on GitHub
+- **Updates:** `git pull origin main`
 
-1. **Dashboard** - Real-time data & status
-2. **Data Tracking** - Historical data & maps
-3. **Data Export** - CSV export & customization
-4. **Settings** - Configuration & preferences
+## ✅ Quick Start Checklist
 
-## ⚡ Quick Start Script
+- [ ] Termux installed
+- [ ] Installation script run successfully
+- [ ] Server starts without errors
+- [ ] Web interface accessible
+- [ ] Mobile interface working
+- [ ] Peer sync interface available
+- [ ] TCP port 3003 open for devices
+- [ ] Network URL accessible from other devices
 
-Create this file for one-command startup:
-```bash
-cat > quick-start.sh << 'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/galileosky-parser
-node termux-enhanced-backend.js
-EOF
-chmod +x quick-start.sh
-./quick-start.sh
-```
+## 🎯 Next Steps
 
-## 🔗 Important URLs
-
-- **Repository**: https://github.com/haryowl/galileosky-parser
-- **F-Droid**: https://f-droid.org/ (for Termux)
-- **Mobile Interface**: http://YOUR_IP:3000
-
-## 📞 Emergency Reset
-
-If everything breaks:
-```bash
-cd /data/data/com.termux/files/home
-rm -rf galileosky-parser
-git clone https://github.com/haryowl/galileosky-parser.git
-cd galileosky-parser
-npm install
-node termux-enhanced-backend.js
-```
+1. **Configure tracking devices** to send data to your phone's IP
+2. **Set up peer-to-peer sync** with other phones
+3. **Customize interface** and settings as needed
+4. **Monitor logs** for incoming data
+5. **Set up auto-start** if needed
 
 ---
 
-**Remember**: Keep phone plugged in when running server! 
+**🎉 Your Galileosky parser is ready to receive and process tracking data!** 

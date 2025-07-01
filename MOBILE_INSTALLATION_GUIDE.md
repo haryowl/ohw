@@ -1,7 +1,7 @@
-# 📱 OHW Parser - Complete Mobile Installation Guide
+# 📱 Galileosky Parser - Complete Mobile Installation Guide
 
 ## 🎯 Overview
-This guide will help you install the OHW parser on a new Android phone from scratch. The parser will run as a mobile server that can receive and process tracking data.
+This guide will help you install the Galileosky parser on a new Android phone from scratch. The parser includes peer-to-peer sync capabilities and can run as a mobile server that receives and processes tracking data.
 
 ## 📋 Prerequisites
 - **Android 7.0+** (API 24+)
@@ -52,17 +52,17 @@ git version 2.x.x
 
 ---
 
-## 📥 Step 3: Download OHW Parser
+## 📥 Step 3: Download Galileosky Parser
 
 ```bash
 # Navigate to home directory
 cd ~
 
 # Clone the OHW Parser repository
-git clone https://github.com/haryowl/galileosky-parser.git
+git clone https://github.com/haryowl/ohw.git
 
 # Enter the project directory
-cd galileosky-parser
+cd ohw
 
 # Verify the download
 ls -la
@@ -70,7 +70,7 @@ ls -la
 
 **Expected Output:**
 ```
-backend/  frontend/  simple-frontend.html  termux-*.sh  *.md
+backend/  frontend/  documentP/  termux-*.sh  *.md
 ```
 
 ---
@@ -86,41 +86,21 @@ cd backend
 npm install --no-optional
 cd ..
 
-# Install frontend dependencies
+# Install frontend dependencies (optional - we'll use mobile frontend)
 cd frontend
 npm install --no-optional
 cd ..
 ```
 
-**Note:** If you get build errors, that's normal - we'll use the pre-built frontend.
+**Note:** If you get build errors, that's normal - we'll use the mobile-optimized frontend.
 
 ---
 
-## 🏗️ Step 5: Build Frontend (Optional)
-
-### If Build Succeeds:
-```bash
-cd frontend
-npm run build
-cd ..
-```
-
-### If Build Fails (Most Common):
-```bash
-# Create a simple frontend directory
-mkdir -p frontend/build
-
-# Copy the simple frontend
-cp simple-frontend.html frontend/build/index.html
-```
-
----
-
-## ⚙️ Step 6: Configure Mobile Settings
+## 🏗️ Step 5: Setup Mobile Configuration
 
 ```bash
 # Create data directories
-mkdir -p backend/data backend/logs
+mkdir -p backend/data backend/logs backend/output
 
 # Create mobile configuration
 cd backend
@@ -130,9 +110,11 @@ PORT=3001
 TCP_PORT=3003
 WS_PORT=3001
 DATABASE_URL=sqlite://./data/mobile.sqlite
-LOG_LEVEL=warn
+LOG_LEVEL=info
 MAX_PACKET_SIZE=512
 CORS_ORIGIN=*
+PEER_SYNC_ENABLED=true
+PEER_SYNC_PORT=3004
 EOF
 
 cd ..
@@ -140,331 +122,328 @@ cd ..
 
 ---
 
-## 🚀 Step 7: Create Management Scripts
+## 🚀 Step 6: Create Management Scripts
 
 ```bash
 # Create start script
-cat > ~/ohw-start.sh << 'EOF'
+cat > ~/galileosky-start.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "🚀 Starting OHW Parser..."
+echo "🚀 Starting Galileosky Parser..."
 
-cd ~/galileosky-parser
+cd ~/ohw
 
 # Check if already running
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         echo "✅ Server is already running (PID: $PID)"
         exit 0
     fi
 fi
 
-# Start the server
-nohup node backend/src/server.js > "$HOME/ohw-server.log" 2>&1 &
+# Start the enhanced backend
+nohup node backend/src/enhanced-backend.js > "$HOME/galileosky-server.log" 2>&1 &
 SERVER_PID=$!
 
 # Save the PID
-echo $SERVER_PID > "$HOME/ohw-server.pid"
+echo $SERVER_PID > "$HOME/galileosky-server.pid"
 
 # Wait and check if started successfully
 sleep 3
 if kill -0 $SERVER_PID 2>/dev/null; then
     echo "✅ Server started successfully (PID: $SERVER_PID)"
     echo "🌐 Local URL: http://localhost:3001"
+    echo "📡 TCP Server: localhost:3003"
+    echo "🔄 Peer Sync: localhost:3004"
     
     # Get IP address
     IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
     if [ -n "$IP_ADDRESSES" ]; then
         echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+        echo "🔄 Peer Sync URL: http://$IP_ADDRESSES:3004"
     fi
 else
     echo "❌ Failed to start server"
-    rm -f "$HOME/ohw-server.pid"
+    rm -f "$HOME/galileosky-server.pid"
     exit 1
 fi
 EOF
 
 # Create status script
-cat > ~/ohw-status.sh << 'EOF'
+cat > ~/galileosky-status.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "📊 OHW Parser Status"
-echo "==================="
+echo "📊 Galileosky Parser Status"
+echo "=========================="
 
 # Check if server is running
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         echo "✅ Server is running (PID: $PID)"
         echo "🌐 Local URL: http://localhost:3001"
+        echo "📡 TCP Server: localhost:3003"
+        echo "🔄 Peer Sync: localhost:3004"
         
-        # Get IP addresses
+        # Get IP address
         IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
         if [ -n "$IP_ADDRESSES" ]; then
             echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+            echo "🔄 Peer Sync URL: http://$IP_ADDRESSES:3004"
         fi
         
         # Show recent logs
         echo ""
-        echo "📋 Recent Logs:"
-        if [ -f "$HOME/ohw-server.log" ]; then
-            tail -5 "$HOME/ohw-server.log"
-        else
-            echo "No logs found"
-        fi
+        echo "📋 Recent logs:"
+        tail -10 "$HOME/galileosky-server.log"
     else
-        echo "❌ Server is not running (PID file exists but process not found)"
+        echo "❌ Server is not running"
+        rm -f "$HOME/galileosky-server.pid"
     fi
 else
-    echo "❌ Server is not running (no PID file)"
+    echo "❌ Server is not running"
 fi
 EOF
 
 # Create stop script
-cat > ~/ohw-stop.sh << 'EOF'
+cat > ~/galileosky-stop.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "🛑 Stopping OHW Parser..."
+echo "🛑 Stopping Galileosky Parser..."
 
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         kill $PID
         echo "✅ Server stopped (PID: $PID)"
-        rm -f "$HOME/ohw-server.pid"
     else
-        echo "❌ Server was not running"
-        rm -f "$HOME/ohw-server.pid"
+        echo "⚠️ Server was not running"
     fi
+    rm -f "$HOME/galileosky-server.pid"
 else
-    echo "❌ No PID file found"
+    echo "⚠️ No server PID file found"
 fi
 EOF
 
-# Create restart script
-cat > ~/ohw-restart.sh << 'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-
-echo "🔄 Restarting OHW Parser..."
-
-# Stop if running
-if [ -f "$HOME/ohw-stop.sh" ]; then
-    source "$HOME/ohw-stop.sh"
-fi
-
-# Wait a moment
-sleep 2
-
-# Start again
-if [ -f "$HOME/ohw-start.sh" ]; then
-    source "$HOME/ohw-start.sh"
-    echo "✅ Server restarted"
-else
-    echo "❌ Start script not found"
-fi
-EOF
-
-# Make all scripts executable
-chmod +x ~/ohw-*.sh
+# Make scripts executable
+chmod +x ~/galileosky-start.sh
+chmod +x ~/galileosky-status.sh
+chmod +x ~/galileosky-stop.sh
 ```
 
 ---
 
-## 🎯 Step 8: Start the Server
+## 🎯 Step 7: Quick Start Options
 
+### Option A: Use Quick Start Script
 ```bash
-# Start the OHW Parser server
-~/ohw-start.sh
+# Navigate to project directory
+cd ~/ohw
+
+# Run quick start
+./termux-quick-start.sh
 ```
 
-**Expected Output:**
-```
-🚀 Starting OHW Parser...
-✅ Server started successfully (PID: 12345)
-🌐 Local URL: http://localhost:3001
-📱 Network URL: http://192.168.1.100:3001
-```
-
----
-
-## 🌐 Step 9: Access the Web Interface
-
-### Option A: Local Access
-1. **Open your phone's browser**
-2. **Go to:** `http://localhost:3001`
-3. **You should see the OHW Parser interface**
-
-### Option B: Network Access (Other Devices)
-1. **Use the Network URL** shown in the start output
-2. **Example:** `http://192.168.1.100:3001`
-3. **Other devices on the same network can access it**
-
----
-
-## 📱 Step 10: Test the Installation
-
+### Option B: Manual Start
 ```bash
-# Check server status
-~/ohw-status.sh
+# Navigate to project directory
+cd ~/ohw
 
-# View real-time logs
-tail -f ~/ohw-server.log
-
-# Test web interface
-# Open browser and go to the URLs shown above
-```
-
----
-
-## 🔄 Step 11: Auto-Start Setup (Optional)
-
-### Option A: Termux:Boot (Recommended)
-```bash
-# Install Termux:Boot app from F-Droid
-# https://f-droid.org/en/packages/com.termux.boot/
-
-# Create boot directory
-mkdir -p ~/.termux/boot
-
-# Copy boot script
-cp termux-boot-startup.sh ~/.termux/boot/ohw-parser-boot.sh
-
-# Make executable
-chmod +x ~/.termux/boot/ohw-parser-boot.sh
-```
-
-### Option B: Termux Widget
-```bash
-# Install Termux:Widget
-pkg install termux-widget -y
-
-# Create widget directory
-mkdir -p ~/.shortcuts
-
-# Create start widget
-cat > ~/.shortcuts/ohw-start << 'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-~/ohw-start.sh
-termux-toast "OHW Parser started"
-EOF
-
-# Create stop widget
-cat > ~/.shortcuts/ohw-stop << 'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-~/ohw-stop.sh
-termux-toast "OHW Parser stopped"
-EOF
-
-# Make widgets executable
-chmod +x ~/.shortcuts/ohw-*
-```
-
----
-
-## 📋 Available Commands
-
-After installation, you have these commands:
-
-```bash
 # Start the server
-~/ohw-start.sh
+./galileosky-start.sh
 
 # Check status
-~/ohw-status.sh
-
-# Stop the server
-~/ohw-stop.sh
-
-# Restart the server
-~/ohw-restart.sh
-
-# View logs
-tail -f ~/ohw-server.log
-
-# View recent logs
-tail -20 ~/ohw-server.log
+./galileosky-status.sh
 ```
 
 ---
 
-## 🔍 Troubleshooting
+## 📱 Step 8: Access the Mobile Interface
 
-### Issue: "Permission denied"
+### Option A: Use Mobile Frontend
+1. **Open your phone's browser**
+2. **Navigate to:** `http://localhost:3001`
+3. **Or use the mobile-optimized interface:** `http://localhost:3001/mobile`
+
+### Option B: Use Peer Sync Interface
+1. **Open your phone's browser**
+2. **Navigate to:** `http://localhost:3001/peer-sync`
+3. **This interface allows peer-to-peer data syncing**
+
+---
+
+## 🔄 Step 9: Peer-to-Peer Sync Setup
+
+### For Hotspot Phone (Primary):
+```bash
+# Start the server
+./galileosky-start.sh
+
+# The server will automatically enable peer sync on port 3004
+```
+
+### For Client Phone (Secondary):
+1. **Connect to the hotspot phone's WiFi**
+2. **Get the hotspot phone's IP address**
+3. **Open browser and go to:** `http://[HOTSPOT_IP]:3001/peer-sync`
+4. **Click "Connect to Peer" and enter the hotspot IP**
+
+---
+
+## 📊 Step 10: Verify Installation
+
+### Check Server Status:
+```bash
+./galileosky-status.sh
+```
+
+### Test API Endpoints:
+```bash
+# Test basic connectivity
+curl http://localhost:3001/api/health
+
+# Test device list
+curl http://localhost:3001/api/devices
+
+# Test data endpoint
+curl http://localhost:3001/api/data
+```
+
+### Expected Output:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+---
+
+## 🛠️ Troubleshooting
+
+### Common Issues:
+
+#### 1. Port Already in Use
+```bash
+# Check what's using the port
+netstat -tulpn | grep :3001
+
+# Kill the process
+kill -9 [PID]
+
+# Restart server
+./galileosky-start.sh
+```
+
+#### 2. Permission Denied
 ```bash
 # Fix script permissions
-chmod +x ~/ohw-*.sh
+chmod +x ~/galileosky-*.sh
+
+# Fix project permissions
+chmod -R 755 ~/ohw
 ```
 
-### Issue: "Port already in use"
+#### 3. Database Issues
 ```bash
-# Kill existing processes
-pkill -f "node.*server.js"
-
-# Or use the stop script
-~/ohw-stop.sh
+# Clear database and restart
+rm -f backend/data/mobile.sqlite
+./galileosky-start.sh
 ```
 
-### Issue: "Node.js not found"
+#### 4. Network Issues
 ```bash
-# Reinstall Node.js
-pkg install nodejs -y
-```
+# Check IP address
+ip route get 1
 
-### Issue: "Cannot access web interface"
-```bash
-# Check if server is running
-~/ohw-status.sh
-
-# Check firewall settings
-# Ensure Termux has network permissions
-```
-
-### Issue: "Build failed"
-```bash
-# This is normal - use the simple frontend
-cp simple-frontend.html frontend/build/index.html
+# Test connectivity
+ping 8.8.8.8
 ```
 
 ---
 
-## 📊 Verification Checklist
+## 📱 Mobile-Specific Features
 
-- ✅ Termux installed and working
-- ✅ Node.js and npm installed
-- ✅ OHW Parser downloaded
-- ✅ Dependencies installed
-- ✅ Server starts successfully
-- ✅ Web interface accessible
-- ✅ Network URL working
-- ✅ Management scripts working
+### 1. Mobile Hotspot Setup
+- **Enable mobile hotspot** on your phone
+- **Other devices can connect** and sync data
+- **Static IP setup** available for stable connections
+
+### 2. Peer-to-Peer Sync
+- **Real-time data synchronization** between devices
+- **Bidirectional sync** with conflict resolution
+- **Device identification** using IMEI numbers
+
+### 3. Mobile-Optimized Interface
+- **Touch-friendly controls**
+- **Responsive design**
+- **Offline capability**
 
 ---
 
-## 🎉 Success!
+## 🔧 Advanced Configuration
 
-Your OHW Parser is now running on your mobile phone! 
+### Custom Ports:
+```bash
+# Edit the .env file
+nano backend/.env
 
-**Key Information:**
-- **Local Access:** `http://localhost:3001`
-- **Network Access:** `http://[YOUR_IP]:3001`
-- **Status Check:** `~/ohw-status.sh`
-- **Logs:** `tail -f ~/ohw-server.log`
+# Change ports as needed
+PORT=3001
+TCP_PORT=3003
+PEER_SYNC_PORT=3004
+```
+
+### Log Level:
+```bash
+# Set log level in .env
+LOG_LEVEL=debug  # Options: error, warn, info, debug
+```
+
+### Database Location:
+```bash
+# Change database path in .env
+DATABASE_URL=sqlite://./data/custom.sqlite
+```
+
+---
+
+## 📞 Support
+
+### Logs Location:
+- **Server logs:** `~/galileosky-server.log`
+- **Application logs:** `backend/logs/`
+
+### Useful Commands:
+```bash
+# View server logs
+tail -f ~/galileosky-server.log
+
+# Check disk usage
+du -sh ~/ohw
+
+# Check memory usage
+ps aux | grep node
+```
+
+### GitHub Repository:
+- **URL:** https://github.com/haryowl/ohw
+- **Issues:** Report problems on GitHub
+- **Updates:** Pull latest changes with `git pull origin main`
+
+---
+
+## ✅ Installation Complete!
+
+Your Galileosky parser is now installed and running on your mobile phone. You can:
+
+1. **Receive tracking data** via TCP on port 3003
+2. **View data** via web interface on port 3001
+3. **Sync with other devices** via peer-to-peer on port 3004
+4. **Manage the server** using the provided scripts
 
 **Next Steps:**
-1. **Configure your tracking devices** to send data to the server
-2. **Set up peer-to-peer sync** if needed
-3. **Monitor the logs** for incoming data
-4. **Access the web interface** to view tracking data
-
----
-
-## 📞 Need Help?
-
-If you encounter issues:
-1. **Check the logs:** `tail -f ~/ohw-server.log`
-2. **Verify status:** `~/ohw-status.sh`
-3. **Restart server:** `~/ohw-restart.sh`
-4. **Check network:** Ensure your phone has internet access
-
-**The OHW Parser is now ready to receive and process tracking data!** 🚀 
+- Configure your tracking devices to send data to your phone's IP
+- Set up peer-to-peer sync with other phones
+- Customize the interface and settings as needed 

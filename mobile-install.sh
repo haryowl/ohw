@@ -1,9 +1,13 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/bin/bash
 
-# OHW Parser - One-Command Mobile Installation Script
-# This script installs the OHW parser on a new mobile phone from scratch
+# 🛰️ Galileosky Parser - Complete Mobile Installation Script
+# This script automates the entire installation process for mobile phones
 
 set -e
+
+echo "========================================"
+echo "  Galileosky Parser - Mobile Installer"
+echo "========================================"
 
 # Colors for output
 RED='\033[0;31m'
@@ -12,144 +16,95 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Function to print colored output
 print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}❌ $1${NC}"
 }
 
-print_header() {
-    echo -e "${BLUE}================================${NC}"
-    echo -e "${BLUE}  OHW Parser - Mobile Installer ${NC}"
-    echo -e "${BLUE}================================${NC}"
+print_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
 }
 
-print_header
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
 
-print_status "Starting OHW Parser mobile installation..."
+# Function to check if port is in use
+port_in_use() {
+    netstat -tulpn 2>/dev/null | grep -q ":$1 "
+}
 
-# Check if we're in Termux
+echo ""
+print_info "Step 1: Checking prerequisites..."
+
+# Check if running in Termux
 if [ ! -d "/data/data/com.termux" ]; then
     print_error "This script must be run in Termux on Android"
     exit 1
 fi
 
-# Step 1: Update and install packages
-print_status "Step 1/8: Installing required packages..."
-pkg update -y
-pkg install nodejs git sqlite wget curl -y
-
-# Verify installations
-if ! command -v node >/dev/null 2>&1; then
-    print_error "Node.js installation failed"
-    exit 1
-fi
-
-NODE_VERSION=$(node --version)
-NPM_VERSION=$(npm --version)
-print_status "Node.js: $NODE_VERSION, npm: $NPM_VERSION"
-
-# Step 2: Download OHW Parser
-print_status "Step 2/8: Downloading OHW Parser..."
-cd ~
-
-if [ -d "galileosky-parser" ]; then
-    print_warning "Project directory already exists, removing..."
-    rm -rf galileosky-parser
-fi
-
-git clone https://github.com/haryowl/galileosky-parser.git
-cd galileosky-parser
-
-if [ ! -f "package.json" ]; then
-    print_error "Failed to download OHW Parser"
-    exit 1
-fi
-
-print_status "OHW Parser downloaded successfully"
-
-# Step 3: Install dependencies
-print_status "Step 3/8: Installing dependencies..."
-
-# Install root dependencies
-npm install --no-optional
-
-# Install backend dependencies with fallback for sqlite3
-cd backend
-print_status "Installing backend dependencies..."
-
-# Try to install with optional dependencies first
-if npm install --no-optional; then
-    print_status "Backend dependencies installed successfully"
-else
-    print_warning "Backend installation failed, trying alternative approach..."
-    
-    # Install Python and build tools for sqlite3
-    pkg install python clang make -y
-    
-    # Try installation again
-    if npm install --no-optional; then
-        print_status "Backend dependencies installed with build tools"
+# Check if we're in the right directory
+if [ ! -f "package.json" ] && [ ! -f "backend/package.json" ]; then
+    print_warning "Not in project directory, checking if we need to clone..."
+    if [ ! -d "ohw" ]; then
+        print_info "Cloning repository..."
+        git clone https://github.com/haryowl/ohw.git
+        cd ohw
     else
-        print_warning "sqlite3 build still failing, using alternative database..."
-        
-        # Create a simple backend configuration that doesn't require sqlite3
-        cat > .env << 'EOF'
-NODE_ENV=production
-PORT=3001
-TCP_PORT=3003
-WS_PORT=3001
-DATABASE_URL=sqlite://./data/mobile.sqlite
-LOG_LEVEL=warn
-MAX_PACKET_SIZE=512
-CORS_ORIGIN=*
-USE_SIMPLE_DB=true
-EOF
-        
-        # Try installing without sqlite3
-        npm install --no-optional --ignore-scripts
-        print_status "Backend dependencies installed (without sqlite3)"
+        cd ohw
     fi
 fi
-cd ..
 
-# Install frontend dependencies
-cd frontend
-npm install --no-optional
-cd ..
+echo ""
+print_info "Step 2: Updating package list..."
+pkg update -y
 
-print_status "Dependencies installed successfully"
+echo ""
+print_info "Step 3: Installing required packages..."
+pkg install -y nodejs git sqlite wget curl
 
-# Step 4: Setup frontend
-print_status "Step 4/8: Setting up frontend..."
+echo ""
+print_info "Step 4: Verifying installations..."
+echo "Node.js version: $(node --version)"
+echo "npm version: $(npm --version)"
+echo "Git version: $(git --version)"
 
-# Create build directory
-mkdir -p frontend/build
+echo ""
+print_info "Step 5: Installing project dependencies..."
 
-# Try to build frontend, fallback to simple frontend if it fails
-cd frontend
-if npm run build 2>/dev/null; then
-    print_status "Frontend built successfully"
-else
-    print_warning "Frontend build failed, using simple frontend"
-    cp ../simple-frontend.html build/index.html
+# Install root dependencies
+if [ -f "package.json" ]; then
+    npm install --no-optional
 fi
-cd ..
 
-# Step 5: Configure mobile settings
-print_status "Step 5/8: Configuring mobile settings..."
+# Install backend dependencies
+if [ -d "backend" ]; then
+    cd backend
+    npm install --no-optional
+    cd ..
+fi
 
-# Create data directories
-mkdir -p backend/data backend/logs
+# Install frontend dependencies (optional)
+if [ -d "frontend" ]; then
+    cd frontend
+    npm install --no-optional
+    cd ..
+fi
 
-# Create mobile configuration
+echo ""
+print_info "Step 6: Creating data directories..."
+mkdir -p backend/data backend/logs backend/output
+
+echo ""
+print_info "Step 7: Creating mobile configuration..."
 cd backend
 cat > .env << 'EOF'
 NODE_ENV=production
@@ -157,189 +112,197 @@ PORT=3001
 TCP_PORT=3003
 WS_PORT=3001
 DATABASE_URL=sqlite://./data/mobile.sqlite
-LOG_LEVEL=warn
+LOG_LEVEL=info
 MAX_PACKET_SIZE=512
 CORS_ORIGIN=*
+PEER_SYNC_ENABLED=true
+PEER_SYNC_PORT=3004
 EOF
 cd ..
 
-print_status "Mobile configuration created"
-
-# Step 6: Create management scripts
-print_status "Step 6/8: Creating management scripts..."
+echo ""
+print_info "Step 8: Creating management scripts..."
 
 # Create start script
-cat > ~/ohw-start.sh << 'EOF'
+cat > ~/galileosky-start.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "🚀 Starting OHW Parser..."
+echo "🚀 Starting Galileosky Parser..."
 
-cd ~/galileosky-parser
+cd ~/ohw
 
 # Check if already running
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         echo "✅ Server is already running (PID: $PID)"
         exit 0
     fi
 fi
 
-# Start the server
-nohup node backend/src/server.js > "$HOME/ohw-server.log" 2>&1 &
+# Start the enhanced backend
+nohup node backend/src/enhanced-backend.js > "$HOME/galileosky-server.log" 2>&1 &
 SERVER_PID=$!
 
 # Save the PID
-echo $SERVER_PID > "$HOME/ohw-server.pid"
+echo $SERVER_PID > "$HOME/galileosky-server.pid"
 
 # Wait and check if started successfully
 sleep 3
 if kill -0 $SERVER_PID 2>/dev/null; then
     echo "✅ Server started successfully (PID: $SERVER_PID)"
     echo "🌐 Local URL: http://localhost:3001"
+    echo "📡 TCP Server: localhost:3003"
+    echo "🔄 Peer Sync: localhost:3004"
     
     # Get IP address
     IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
     if [ -n "$IP_ADDRESSES" ]; then
         echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+        echo "🔄 Peer Sync URL: http://$IP_ADDRESSES:3004"
     fi
 else
     echo "❌ Failed to start server"
-    rm -f "$HOME/ohw-server.pid"
+    rm -f "$HOME/galileosky-server.pid"
     exit 1
 fi
 EOF
 
 # Create status script
-cat > ~/ohw-status.sh << 'EOF'
+cat > ~/galileosky-status.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "📊 OHW Parser Status"
-echo "==================="
+echo "📊 Galileosky Parser Status"
+echo "=========================="
 
 # Check if server is running
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         echo "✅ Server is running (PID: $PID)"
         echo "🌐 Local URL: http://localhost:3001"
+        echo "📡 TCP Server: localhost:3003"
+        echo "🔄 Peer Sync: localhost:3004"
         
-        # Get IP addresses
+        # Get IP address
         IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
         if [ -n "$IP_ADDRESSES" ]; then
             echo "📱 Network URL: http://$IP_ADDRESSES:3001"
+            echo "🔄 Peer Sync URL: http://$IP_ADDRESSES:3004"
         fi
         
         # Show recent logs
         echo ""
-        echo "📋 Recent Logs:"
-        if [ -f "$HOME/ohw-server.log" ]; then
-            tail -5 "$HOME/ohw-server.log"
-        else
-            echo "No logs found"
-        fi
+        echo "📋 Recent logs:"
+        tail -10 "$HOME/galileosky-server.log"
     else
-        echo "❌ Server is not running (PID file exists but process not found)"
+        echo "❌ Server is not running"
+        rm -f "$HOME/galileosky-server.pid"
     fi
 else
-    echo "❌ Server is not running (no PID file)"
+    echo "❌ Server is not running"
 fi
 EOF
 
 # Create stop script
-cat > ~/ohw-stop.sh << 'EOF'
+cat > ~/galileosky-stop.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "🛑 Stopping OHW Parser..."
+echo "🛑 Stopping Galileosky Parser..."
 
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
+if [ -f "$HOME/galileosky-server.pid" ]; then
+    PID=$(cat "$HOME/galileosky-server.pid")
     if kill -0 $PID 2>/dev/null; then
         kill $PID
         echo "✅ Server stopped (PID: $PID)"
-        rm -f "$HOME/ohw-server.pid"
     else
-        echo "❌ Server was not running"
-        rm -f "$HOME/ohw-server.pid"
+        echo "⚠️ Server was not running"
     fi
+    rm -f "$HOME/galileosky-server.pid"
 else
-    echo "❌ No PID file found"
+    echo "⚠️ No server PID file found"
 fi
 EOF
 
 # Create restart script
-cat > ~/ohw-restart.sh << 'EOF'
+cat > ~/galileosky-restart.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "🔄 Restarting OHW Parser..."
+echo "🔄 Restarting Galileosky Parser..."
 
 # Stop if running
-if [ -f "$HOME/ohw-stop.sh" ]; then
-    source "$HOME/ohw-stop.sh"
-fi
+~/galileosky-stop.sh
 
 # Wait a moment
 sleep 2
 
 # Start again
-if [ -f "$HOME/ohw-start.sh" ]; then
-    source "$HOME/ohw-start.sh"
-    echo "✅ Server restarted"
-else
-    echo "❌ Start script not found"
-fi
+~/galileosky-start.sh
 EOF
 
-# Make all scripts executable
-chmod +x ~/ohw-*.sh
+# Make scripts executable
+chmod +x ~/galileosky-*.sh
 
-print_status "Management scripts created"
+echo ""
+print_info "Step 9: Checking for port conflicts..."
 
-# Step 7: Test the installation
-print_status "Step 7/8: Testing the installation..."
-
-# Start the server
-~/ohw-start.sh
-
-# Wait a moment for server to fully start
-sleep 5
-
-# Check if server is running
-if [ -f "$HOME/ohw-server.pid" ]; then
-    PID=$(cat "$HOME/ohw-server.pid")
-    if kill -0 $PID 2>/dev/null; then
-        print_status "✅ Server test successful"
-    else
-        print_error "❌ Server test failed"
-        exit 1
-    fi
-else
-    print_error "❌ Server test failed - no PID file"
-    exit 1
+# Check if ports are available
+if port_in_use 3001; then
+    print_warning "Port 3001 is already in use"
+    echo "You may need to stop other services or change the port"
 fi
 
-# Step 8: Installation complete
-print_status "Step 8/8: Installation complete!"
+if port_in_use 3003; then
+    print_warning "Port 3003 is already in use"
+fi
+
+if port_in_use 3004; then
+    print_warning "Port 3004 is already in use"
+fi
 
 echo ""
-echo -e "${GREEN}🎉 OHW Parser installed successfully!${NC}"
+print_info "Step 10: Installation complete!"
+
 echo ""
-echo "📋 Available commands:"
-echo "  ~/ohw-start.sh   - Start the server"
-echo "  ~/ohw-status.sh  - Check server status"
-echo "  ~/ohw-stop.sh    - Stop the server"
-echo "  ~/ohw-restart.sh - Restart the server"
+print_status "🎉 Galileosky Parser has been installed successfully!"
+echo ""
+echo "📱 Available commands:"
+echo "  ~/galileosky-start.sh    - Start the server"
+echo "  ~/galileosky-status.sh   - Check server status"
+echo "  ~/galileosky-stop.sh     - Stop the server"
+echo "  ~/galileosky-restart.sh  - Restart the server"
 echo ""
 echo "🌐 Access URLs:"
-echo "  Local:  http://localhost:3001"
-IP_ADDRESSES=$(ip route get 1 | awk '{print $7; exit}')
-if [ -n "$IP_ADDRESSES" ]; then
-    echo "  Network: http://$IP_ADDRESSES:3001"
+echo "  Local: http://localhost:3001"
+echo "  Mobile: http://localhost:3001/mobile"
+echo "  Peer Sync: http://localhost:3001/peer-sync"
+echo ""
+echo "📡 Server Ports:"
+echo "  HTTP/WebSocket: 3001"
+echo "  TCP (Devices): 3003"
+echo "  Peer Sync: 3004"
+echo ""
+
+# Ask if user wants to start the server now
+read -p "Do you want to start the server now? (y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    print_info "Starting server..."
+    ~/galileosky-start.sh
+    
+    echo ""
+    print_status "Server started! You can now:"
+    echo "1. Open your browser and go to http://localhost:3001"
+    echo "2. Use the mobile interface at http://localhost:3001/mobile"
+    echo "3. Set up peer-to-peer sync at http://localhost:3001/peer-sync"
+    echo ""
+    echo "To check server status: ~/galileosky-status.sh"
+    echo "To stop the server: ~/galileosky-stop.sh"
+else
+    echo ""
+    print_info "To start the server later, run: ~/galileosky-start.sh"
 fi
+
 echo ""
-echo "📱 Next steps:"
-echo "  1. Open your browser and go to the URLs above"
-echo "  2. Configure your tracking devices to send data"
-echo "  3. Monitor logs with: tail -f ~/ohw-server.log"
-echo ""
-echo -e "${BLUE}The OHW Parser is now ready to receive tracking data!${NC}" 
+print_status "Installation complete! 🚀" 
