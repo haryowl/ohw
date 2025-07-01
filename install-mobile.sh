@@ -37,8 +37,8 @@ fi
 
 # Run the full installation script
 echo "🔧 Running installation..."
-chmod +x mobile-install.sh
-./mobile-install.sh
+chmod +x install-ohw-mobile.sh
+./install-ohw-mobile.sh
 
 echo ""
 echo "🎉 Installation complete!"
